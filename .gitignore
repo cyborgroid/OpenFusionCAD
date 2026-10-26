@@ -1,8 +1,10 @@
 # 빌드 산출물
 /target/
 /dist/
-**/bin/
-**/obj/
+/gui/bin/
+/app/bin/
+/gui/obj/
+/app/obj/
 
 # Autodesk 소유 파일 – 저장소에 포함하지 않는다
 # (원본 설치기는 각자 받아서 루트에 두고, 리소스는 scripts/extract-assets.sh 로 추출)
