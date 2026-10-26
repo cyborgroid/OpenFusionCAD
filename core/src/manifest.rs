@@ -166,6 +166,18 @@ impl PackageManifest {
         self.root.destination.as_deref()
     }
 
+    /// 내려받을 아카이브 목록. `non-patched` 가 비어 있으면 패키지 체크섬 자체,
+    /// 내용 크기가 0 인 패키지(디렉터리/특수 동작 전용)는 없음.
+    pub fn archives(&self, compressed_size: u64) -> Vec<String> {
+        if !self.non_patched.is_empty() {
+            self.non_patched.clone()
+        } else if compressed_size > 0 {
+            vec![self.checksum.clone()]
+        } else {
+            vec![]
+        }
+    }
+
     pub fn has_task(&self, id: &str) -> bool {
         let id = id.to_ascii_lowercase();
         self.pre_deploy_tasks
@@ -196,18 +208,37 @@ impl PackageManifest {
 
     /// 파일 ID → 경로 맵 (manifests.Package._IdMapEntry)
     pub fn id_map(&self, base: &Path) -> Vec<(String, IdEntry)> {
-        let mut out = vec![];
-        self.walk(base, &mut |_, _| {}, &mut |p, f| {
-            if let Some(id) = f.id() {
-                out.push((id.to_string(), IdEntry { path: p.to_path_buf(), node: f.clone() }));
-            }
-        });
-        out
+        let out = std::cell::RefCell::new(vec![]);
+        self.walk(
+            base,
+            &mut |p, d| {
+                if let Some(id) = d.properties.get("id").and_then(Value::as_str) {
+                    let node = FileNode { name: d.name.clone(), properties: d.properties.clone() };
+                    out.borrow_mut().push((id.to_string(), IdEntry { path: p.to_path_buf(), node }));
+                }
+            },
+            &mut |p, f| {
+                if let Some(id) = f.id() {
+                    out.borrow_mut().push((id.to_string(), IdEntry { path: p.to_path_buf(), node: f.clone() }));
+                }
+            },
+        );
+        out.into_inner()
     }
 }
 
-/// 매니페스트 문자열 안의 `${location_<id>}`, `${dirsep}`, `{stream_tag}`, `${streamtag}` 치환
+/// 매니페스트 문자열 안의 `${location_<id>}`, `${dirsep}`, `{stream_tag}`, `${streamtag}` 치환.
+/// 결과는 Linux 경로 (다운로더 자신의 파일 작업용)
 pub fn expand(s: &str, paths: &crate::config::Paths) -> String {
+    expand_impl(s, paths, false).replace('\\', "/")
+}
+
+/// Wine 안의 Fusion 이 읽는 파일(설정 템플릿, 런처 ini, 외부 설치 인자)용: Windows 경로(C:\\...)
+pub fn expand_win(s: &str, paths: &crate::config::Paths) -> String {
+    expand_impl(s, paths, true)
+}
+
+fn expand_impl(s: &str, paths: &crate::config::Paths, win: bool) -> String {
     let mut out = String::with_capacity(s.len());
     let mut rest = s;
     while let Some(i) = rest.find("${") {
@@ -216,10 +247,10 @@ pub fn expand(s: &str, paths: &crate::config::Paths) -> String {
         if let Some(j) = after.find('}') {
             let key = &after[..j];
             let rep = if let Some(id) = key.strip_prefix("location_") {
-                paths.location(id).map(|p| p.to_string_lossy().into_owned())
+                paths.location(id).map(|p| if win { paths.to_windows_path(&p) } else { p.to_string_lossy().into_owned() })
             } else {
                 match key {
-                    "dirsep" => Some("/".to_string()),
+                    "dirsep" => Some(if win { "\\".to_string() } else { "/".to_string() }),
                     // production 스트림은 빈 태그 (Windows AUMID 'AutodeskInc.Fusion360' 와 동일)
                     "streamtag" => Some(stream_tag_suffix(&paths.stream)),
                     _ => None,
@@ -240,13 +271,14 @@ pub fn expand(s: &str, paths: &crate::config::Paths) -> String {
         }
     }
     out.push_str(rest);
-    out.replace("{stream_tag}", &paths.stream).replace('\\', "/")
+    out.replace("{stream_tag}", &paths.stream)
 }
 
-fn stream_tag_suffix(stream: &str) -> String {
+/// 원본 config['streamtag']: production 은 빈 문자열, 그 외는 `[stream]`
+pub fn stream_tag_suffix(stream: &str) -> String {
     if stream == "production" {
         String::new()
     } else {
-        stream.to_string()
+        format!("[{stream}]")
     }
 }

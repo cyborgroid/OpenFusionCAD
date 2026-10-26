@@ -230,7 +230,7 @@ impl Paths {
             location::COMMON_DATA => la.join("Common"),
             location::SHARED => la.join("webdeploy/shared"),
             location::STREAMER => la.join("webdeploy/meta/streamer"),
-            location::REGISTRY => self.data.clone(),
+            location::REGISTRY => la.join("webdeploy/meta/registry"),
             _ => return None,
         })
     }
