@@ -134,14 +134,20 @@ impl Net {
     }
 
     pub fn get_string(&self, url: &str) -> Result<String, NetError> {
+        self.get_with_etag(url).map(|(s, _)| s)
+    }
+
+    /// 본문과 ETag 를 함께 반환 (WRITE_STREAMER_OPTIONS 의 ETag 기록용)
+    pub fn get_with_etag(&self, url: &str) -> Result<(String, Option<String>), NetError> {
         log::info!("Opening manifest at: {url}");
         let r = self.get(url, 0)?;
         let final_url = r.get_url().to_string();
+        let etag = r.header("ETag").map(String::from);
         let s = r.into_string().map_err(|e| NetError::Other(e.to_string()))?;
         if final_url.contains("/message/NotFound") {
             return Err(NetError::NotFound(url.into()));
         }
-        Ok(s)
+        Ok((s, etag))
     }
 
     /// 간단한 연결 확인 (prechecks.CheckNetworkConnectivity)
