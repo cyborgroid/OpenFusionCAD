@@ -469,12 +469,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glam"
-version = "0.29.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8babf46d4c1c9d92deac9f7be466f76dfc4482b6452fc5024b5e8daf6ffeb3ee"
-
-[[package]]
 name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -770,7 +764,7 @@ dependencies = [
 name = "ofc-kernel"
 version = "0.1.0"
 dependencies = [
- "glam 0.29.3",
+ "glam",
  "opencascade",
  "serde",
  "serde_json",
@@ -795,7 +789,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e9b350ed6cc9b368519c3a745ef6e834cf2fd1c84c863fd483e59b1d87cbdc"
 dependencies = [
  "cxx",
- "glam 0.24.2",
+ "glam",
  "opencascade-kicad-parser",
  "opencascade-sys",
  "thiserror",

@@ -277,7 +277,10 @@ pub fn mesh_body(shape: &Shape, tol: f64) -> Result<MeshOut, String> {
             Err(_) => continue,
         };
         let base = (m.positions.len() / 3) as u32;
-        let n0 = face.normal_at_center();
+        // normal_at_center() 는 무게중심을 곡면에 투영하는데, 원통 안쪽 면처럼 중심이 축 위에
+        // 있으면 투영 해가 정해지지 않아 OCCT 가 Standard_OutOfRange 로 프로세스를 종료시킨다.
+        // 메시 법선(바깥 방향)을 대신 사용한다.
+        let n0 = fm.normals.first().copied().unwrap_or(DVec3::Z).normalize_or_zero();
         let mut planar = true;
         for (v, n) in fm.vertices.iter().zip(fm.normals.iter()) {
             m.positions.extend([v.x as f32, v.y as f32, v.z as f32]);
@@ -292,9 +295,7 @@ pub fn mesh_body(shape: &Shape, tol: f64) -> Result<MeshOut, String> {
         }
         m.indices.extend(fm.indices.iter().map(|i| base + *i as u32));
         let c = face.center_of_mass();
-        // 면 법선을 메시 법선 방향(바깥쪽)으로 맞춘다
-        let n_out = if let Some(n) = fm.normals.first() { if n.dot(n0) < 0.0 { -n0 } else { n0 } } else { n0 };
-        m.face_info.extend([if planar { 1.0 } else { 0.0 }, c.x as f32, c.y as f32, c.z as f32, n_out.x as f32, n_out.y as f32, n_out.z as f32]);
+        m.face_info.extend([if planar { 1.0 } else { 0.0 }, c.x as f32, c.y as f32, c.z as f32, n0.x as f32, n0.y as f32, n0.z as f32]);
     }
     m.face_start.push((m.indices.len() / 3) as u32);
     for (i, (_, pts)) in unique_edges(shape).iter().enumerate() {
