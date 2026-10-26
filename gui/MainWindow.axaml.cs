@@ -85,6 +85,7 @@ public partial class MainWindow : Window
 
     void Start()
     {
+        if (Program.Demo is { } demo) { RunDemo(demo); return; }
         _running = true;
         var req = Program.Request.ToJsonString();
         new Thread(() =>
@@ -137,6 +138,33 @@ public partial class MainWindow : Window
     }
 
     static string S(JsonObject o, string k) => o[k]?.GetValue<string>() ?? "";
+
+    /// 개발·검증용: 엔진 없이 각 화면 상태를 재현 (--demo progress|error|query|precheck|survey|proxy)
+    void RunDemo(string demo)
+    {
+        new Thread(() =>
+        {
+            string Ev(string js) => OnEngineEvent(js) ?? "";
+            Ev("{\"type\":\"progress\",\"step\":3,\"step_total\":5,\"description\":\"Downloading Autodesk Fusion  (612 / 1509 MB)\",\"percentage\":41.5,\"update_bg\":true}");
+            Thread.Sleep(1500);
+            var r = demo switch
+            {
+                "error" => Ev("{\"type\":\"reporterror\",\"title\":\"Problem installing Fusion\",\"what_label\":\"What's wrong?\",\"what\":\"Network failure.  Unable to recover.\",\"detail\":\"Connection reset by peer, url:https://dl.appstreaming.autodesk.com/production/packages/xxx.tar.xz\",\"todo_label\":\"What should I do?\",\"todo\":\"Make sure your internet is working normally or switch to a more stable connection, then run the installer again.\",\"log_dir\":\"/tmp\",\"log_file\":\"/tmp/x.log\",\"primary\":\"OK\",\"secondary\":\"Open Log File Location\"}"),
+                "query" => Ev("{\"type\":\"promptuser\",\"title\":\"Latest version already installed\",\"body\":\"You have the latest version of Autodesk Fusion.\\n\\nWould you like to start the application?\",\"primary\":\"Yes\",\"secondary\":\"No\"}"),
+                "precheck" => Ev("{\"type\":\"precheckfailure\",\"paragraph\":\"The installer could not continue because of the following issues:\",\"items\":[{\"description\":\"Wine is not installed or too old (9.0 or later is required).\",\"url\":\"https://gitlab.winehq.org\"},{\"description\":\"System is out of disk space. Please create 8 GB of space before proceeding.\",\"url\":\"https://knowledge.autodesk.com\"}],\"hyperlink\":\"Learn more..\",\"btn_retest\":\"Re-Test\",\"btn_cancel\":\"Cancel\"}"),
+                "survey" => Ev("{\"type\":\"abortuninstall\",\"title\":\"We are sorry to see you go.\",\"continue_label\":\"Uninstall\",\"cancel_label\":\"Cancel\"}"),
+                "proxy" => Ev("{\"type\":\"provideproxycreds\",\"summary\":\"Proxy authentication required\",\"message\":\"Enter the user name and password for the proxy server.\"}"),
+                _ => "",
+            };
+            Console.WriteLine($"demo result: {r}");
+            for (int i = 42; i <= 100; i += 2)
+            {
+                Ev($"{{\"type\":\"progress\",\"step\":3,\"step_total\":5,\"description\":\"Installing Autodesk Fusion\",\"percentage\":{i},\"update_bg\":true}}");
+                Thread.Sleep(120);
+            }
+            Dispatcher.UIThread.Post(Close);
+        }) { IsBackground = true }.Start();
+    }
 
     // ------------------------------------------------------------------ progress
 

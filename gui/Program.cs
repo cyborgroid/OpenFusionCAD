@@ -18,6 +18,7 @@ public static class Program
 
     public static JsonObject Request { get; private set; } = new();
     public static string ResourcesDir { get; private set; } = "";
+    public static string? Demo { get; private set; }
     public static string Process => Request["process"]?.GetValue<string>() ?? "deploy";
     public static string AppId => Request["app_id"]?.GetValue<string>() ?? FusionAppId;
 
@@ -103,6 +104,7 @@ public static class Program
                 case "--threadscount" when i + 1 < args.Length && int.TryParse(args[i + 1], out var n): r["threads"] = n; i++; break;
                 case "--wine" when i + 1 < args.Length: wine["wine_bin"] = args[++i]; break;
                 case "--no-dxvk": wine["dxvk"] = false; break;
+                case "--demo" when i + 1 < args.Length: Demo = args[++i]; break;
                 case "--with-webview2": wine["webview2"] = true; break;
                 case "--": for (i++; i < args.Length; i++) launchArgs.Add(args[i]); break;
                 default: break; // -g, --ppid 등 원본 호환 인자는 무시
