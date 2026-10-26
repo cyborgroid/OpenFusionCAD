@@ -464,8 +464,9 @@ void main(){ frag = vec4(vC, 1.0); }";
                 // 끝점 표시 (작은 사각형)
                 var pts = new List<float>();
                 float s = Camera.PixelSize * 2.5f;
-                foreach (var e in sv.Sketch.Entities)
-                    foreach (var p in SketchGeom.SnapPoints(e)) Square(pts, f, p, s);
+                if (Scene.ShowSketchPoints)
+                    foreach (var e in sv.Sketch.Entities)
+                        foreach (var p in SketchGeom.SnapPoints(e)) Square(pts, f, p, s);
                 DrawLines(pts.ToArray(), vp, SketchColor, noDepth: true);
                 // 그리는 중 미리보기
                 var prev = new List<float>();

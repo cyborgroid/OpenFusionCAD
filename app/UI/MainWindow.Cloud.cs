@@ -41,14 +41,18 @@ public partial class MainWindow
     {
         bool on = _aps?.SignedIn == true;
         var name = _aps?.UserName ?? (on ? "Autodesk 계정" : null);
-        UserButton.Content = new StackPanel
-        {
-            Orientation = Orientation.Horizontal, Spacing = 6,
-            Children = { Icons.Make("user", 18), new TextBlock { Text = name ?? "로그인", FontSize = 12, VerticalAlignment = VerticalAlignment.Center } },
-        };
-        CloudText.Text = on ? "Autodesk 연결됨" : "오프라인";
-        CloudText.Foreground = new SolidColorBrush(Color.Parse(on ? "#1E6B3D" : "#5B616B"));
+        // Fusion: 오른쪽 위 원 안에 사용자 이니셜
+        UserInitials.Text = on ? Initials(name) : "?";
+        UserButton.Classes.Set("signedin", on);
+        ToolTip.SetTip(UserButton, on ? $"{name}{(_aps?.Email != null ? $" ({_aps.Email})" : "")}" : "로그인");
         DataAccount.Text = on ? $"{name}{(_aps?.Email != null ? $" · {_aps.Email}" : "")}" : "로그인하지 않음";
+    }
+
+    static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{char.ToUpper(parts[0][0])}{char.ToUpper(parts[^1][0])}" : name.Trim()[..1].ToUpper();
     }
 
     void BuildUserMenu()

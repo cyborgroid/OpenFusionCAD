@@ -66,6 +66,14 @@ public static class SketchGeom
         {
             case LineEntity l: yield return [P(l.A), P(l.B)]; break;
             case ConstructionEntity c: yield return [P(c.A), P(c.B)]; break;
+            case PointEntity pt:
+            {
+                // 점은 작은 십자로 표시/선택
+                var q = P(pt.P);
+                yield return [q - new Vector2(0.4f, 0), q + new Vector2(0.4f, 0)];
+                yield return [q - new Vector2(0, 0.4f), q + new Vector2(0, 0.4f)];
+                break;
+            }
             case RectEntity r:
                 var p = new[] { P(r.A), new Vector2((float)r.B[0], (float)r.A[1]), P(r.B), new Vector2((float)r.A[0], (float)r.B[1]) };
                 yield return [p[0], p[1], p[2], p[3], p[0]];
@@ -106,6 +114,7 @@ public static class SketchGeom
         {
             case LineEntity l: yield return P(l.A); yield return P(l.B); yield return (P(l.A) + P(l.B)) / 2; break;
             case ConstructionEntity c: yield return P(c.A); yield return P(c.B); break;
+            case PointEntity pt: yield return P(pt.P); break;
             case RectEntity r:
                 yield return P(r.A); yield return P(r.B);
                 yield return new Vector2((float)r.B[0], (float)r.A[1]); yield return new Vector2((float)r.A[0], (float)r.B[1]);

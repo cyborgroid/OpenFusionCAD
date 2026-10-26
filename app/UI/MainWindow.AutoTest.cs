@@ -187,6 +187,7 @@ public partial class MainWindow
             var bad = _last?.Features.FirstOrDefault(f => _doc.Find(f.Id)?.Name == "BadFillet");
             Check(bad is { Ok: false } && Scene.Bodies.Count == 1, $"실패 피처만 오류 표시, 나머지 유지 ({bad?.Error})");
             await Shot("05-failed-feature");
+            await RunParitySteps();
         }
         catch (Exception e)
         {

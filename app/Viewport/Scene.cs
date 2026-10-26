@@ -58,6 +58,7 @@ public sealed class Scene
     public string? HoverPlane;
     public bool ShowOrigin = false; // Fusion: 원점 전구 기본 꺼짐
     public bool ShowGrid = true;
+    public bool ShowSketchPoints = true;
 
     /// 바디가 바뀌면 증가 → GPU 버퍼 재업로드
     public int BodyVersion;
