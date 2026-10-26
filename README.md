@@ -69,6 +69,8 @@ fusion-client-downloader -p reinstall --deep_clean
 ofc-streamer -p deploy --no-auto-launch          # 터미널/헤드리스 설치
 ofc-streamer launch                              # 업데이트 확인 후 Fusion 실행
 ofc-streamer -p query                            # 설치 정보(JSON)
+ofc-streamer monitor                             # 진행 상황·아카이브별 다운로드/설치 과정을 표로 실시간 표시
+ofc-streamer monitor --follow --all              # 다음 작업까지 계속 감시, 모든 행 표시
 ofc-streamer -p pull --pull-dir ~/fusion-mirror  # 오프라인 미러 생성 → 이후 -c file://… 로 설치
 ```
 

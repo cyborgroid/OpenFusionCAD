@@ -93,6 +93,21 @@ enum Cmd {
     },
     /// URL 스킴 처리기 (adskidmgr:// → Identity Manager, fusion360:// → Fusion)
     HandleUri { uri: String },
+    /// 설치 진행 상황과 아카이브별 다운로드/설치 과정을 표로 실시간 표시
+    Monitor {
+        /// 한 번만 출력하고 종료
+        #[arg(long)]
+        once: bool,
+        /// 화면 높이와 관계없이 모든 행 표시
+        #[arg(long)]
+        all: bool,
+        /// 작업이 끝나도 계속 대기 (다음 작업까지 감시)
+        #[arg(long)]
+        follow: bool,
+        /// 갱신 주기(ms)
+        #[arg(long, default_value_t = 1000)]
+        interval: u64,
+    },
     /// .ico → .png 변환 (패키징 스크립트용)
     #[command(hide = true)]
     ExportIcon { ico: PathBuf, png: PathBuf },
@@ -299,6 +314,13 @@ fn main() {
     let code = match &cli.cmd {
         Some(Cmd::Launch { uri, args, no_update_check }) => launch(&cli, uri.clone(), args.clone(), *no_update_check),
         Some(Cmd::HandleUri { uri }) => handle_uri(&cli, uri),
+        Some(Cmd::Monitor { once, all, follow, interval }) => match build_request(&cli) {
+            Ok(req) => ofc_core::monitor::run(
+                &ofc_core::config::Paths::new(&req),
+                &ofc_core::monitor::Options { once: *once, all: *all, follow: *follow, interval_ms: *interval },
+            ),
+            Err(e) => fail(&e),
+        },
         Some(Cmd::ExportIcon { ico, png }) => match ofc_core::desktop::ico_to_png(ico, png) {
             Ok(()) => 0,
             Err(e) => fail(&e),

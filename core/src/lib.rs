@@ -11,10 +11,12 @@ pub mod desktop;
 pub mod events;
 pub mod i18n;
 pub mod manifest;
+pub mod monitor;
 pub mod net;
 pub mod precheck;
 pub mod process;
 pub mod registry;
+pub mod status;
 pub mod tasks;
 pub mod wine;
 

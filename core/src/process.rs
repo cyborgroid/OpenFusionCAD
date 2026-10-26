@@ -11,6 +11,7 @@ use crate::manifest::{AppManifest, PackageManifest, PackageRef};
 use crate::net::{Net, NetError};
 use crate::precheck;
 use crate::registry::Registry;
+use crate::status::{self, JobStat, State};
 use crate::tasks::{self, Ctx};
 use crate::wine::Wine;
 use std::collections::{HashSet, VecDeque};
@@ -60,6 +61,8 @@ pub struct Runner {
     pub ui: Ui,
     pub net: Net,
     pub log_file: PathBuf,
+    started: u64,
+    last_rows: Mutex<Vec<status::Row>>,
 }
 
 /// 동시에 하나의 설치기만 실행 (원본: "An installation is already in progress")
@@ -77,7 +80,7 @@ impl Runner {
     pub fn new(req: Request, ui: Ui, log_file: PathBuf) -> Runner {
         let paths = Paths::new(&req);
         let net = Net::new(ui.clone());
-        Runner { req, paths, ui, net, log_file }
+        Runner { req, paths, ui, net, log_file, started: status::now(), last_rows: Mutex::new(vec![]) }
     }
 
     fn manifest_url(&self, app_id: &str) -> String {
@@ -123,7 +126,40 @@ impl Runner {
         }
     }
 
+    fn progress(&self, step: u32, total: u32, desc: &str, pct: f64) {
+        self.ui.progress(step, total, desc, pct);
+        if self.req.process != ProcessKind::Query {
+            self.write_status(desc, pct, None, false, None);
+        }
+    }
+
+    /// monitor 용 상태 파일 기록
+    fn write_status(&self, phase: &str, pct: f64, rows: Option<Vec<status::Row>>, finished: bool, ok: Option<bool>) {
+        let mut last = self.last_rows.lock().unwrap();
+        if let Some(r) = rows {
+            *last = r;
+        }
+        status::write(
+            &self.paths.data.join("status.json"),
+            &status::Snapshot {
+                pid: std::process::id(),
+                process: format!("{:?}", self.req.process).to_lowercase(),
+                version: String::new(),
+                phase: phase.to_string(),
+                percentage: pct,
+                started: self.started,
+                updated: status::now(),
+                finished,
+                ok,
+                rows: last.clone(),
+            },
+        );
+    }
+
     fn done(&self, ok: bool, message: String) -> Outcome {
+        if self.req.process != ProcessKind::Query {
+            self.write_status(&message, if ok { 100.0 } else { 0.0 }, None, true, Some(ok));
+        }
         self.ui.send(Event::Complete { ok, message: message.clone() });
         Outcome { ok, message }
     }
@@ -175,7 +211,7 @@ impl Runner {
     // ------------------------------------------------------------------ prechecks
     fn prechecks(&self) -> Result<(), Fail> {
         loop {
-            self.ui.progress(1, 5, &tr("Running pre-checks"), 0.0);
+            self.progress(1, 5, &tr("Running pre-checks"), 0.0);
             let fails = precheck::run(&self.paths, &self.net, &self.req.root_url(), &self.req.wine.wine_bin);
             if fails.is_empty() {
                 return Ok(());
@@ -232,7 +268,7 @@ impl Runner {
                         }
                     }
                     let n = done.fetch_add(1, Ordering::Relaxed) + 1;
-                    self.ui.progress(2, 5, &tr("Setting Up"), 1.0 + 3.0 * n as f64 / refs.len().max(1) as f64);
+                    self.progress(2, 5, &tr("Setting Up"), 1.0 + 3.0 * n as f64 / refs.len().max(1) as f64);
                 });
             }
         });
@@ -252,10 +288,10 @@ impl Runner {
     }
 
     fn deploy(&self) -> Result<String, Fail> {
-        self.ui.progress(0, 5, &tr("Initializing..."), 0.0);
+        self.progress(0, 5, &tr("Initializing..."), 0.0);
         self.prechecks()?;
         self.check_cancel()?;
-        self.ui.progress(2, 5, &tr("Setting Up"), 1.0);
+        self.progress(2, 5, &tr("Setting Up"), 1.0);
         let (app, etag) = self.fetch_app(&self.req.app_id)?;
         let mut reg = self.registry()?;
 
@@ -294,7 +330,7 @@ impl Runner {
         self.check_cancel()?;
 
         // Wine prefix
-        self.ui.progress(3, 5, &tr("Preparing Wine environment"), 4.0);
+        self.progress(3, 5, &tr("Preparing Wine environment"), 4.0);
         let wine = self.wine().ok_or_else(|| err("Operating system is not supported", tr("Wine is not installed or too old (9.0 or later is required).")))?;
         wine.init_prefix().map_err(|e| err("Unable to Install", e))?;
         if self.req.wine.dxvk {
@@ -318,12 +354,12 @@ impl Runner {
         self.check_cancel()?;
 
         // post-deploy tasks
-        self.ui.progress(4, 5, &tr("Configuring Autodesk account sign-in"), 96.0);
+        self.progress(4, 5, &tr("Configuring Autodesk account sign-in"), 96.0);
         let ctx = Ctx::new(&self.paths, &self.req, Some(&wine), &app, &packages, manifest_url, etag);
         for p in &packages {
             tasks::run_post_deploy(&ctx, p);
         }
-        self.ui.progress(4, 5, &tr("Creating launchers"), 98.0);
+        self.progress(4, 5, &tr("Creating launchers"), 98.0);
         if let Err(e) = tasks::finish_install(&ctx) {
             log::warn!("desktop integration: {e}");
         }
@@ -332,10 +368,10 @@ impl Runner {
             .map_err(|e| err("Install registry is not recognized", e))?;
         reg.set_stream(&self.req.stream, &self.req.root_url()).ok();
 
-        self.ui.progress(5, 5, &tr("Finishing installation"), 99.0);
+        self.progress(5, 5, &tr("Finishing installation"), 99.0);
         self.cleanup_old(&mut reg, &packages);
         wine.wait_server();
-        self.ui.progress(5, 5, &tr("Installation complete"), 100.0);
+        self.progress(5, 5, &tr("Installation complete"), 100.0);
 
         if !self.req.no_auto_launch && !self.req.quiet {
             if let Some(exe) = ctx.main_exe() {
@@ -350,23 +386,29 @@ impl Runner {
             idx: usize,
             archive: String,
             size: u64,
+            stat: usize,
         }
+        let mut stats: Vec<JobStat> = vec![];
         let stream = self.req.stream.clone();
         // 이미 설치된(같은 체크섬) 패키지는 건너뜀 – 패치 대신 변경된 패키지만 전체 다운로드
         let mut jobs = VecDeque::new();
         let mut remaining_per_pkg = vec![0usize; packages.len()];
         for (i, (r, p)) in refs.iter().zip(packages).enumerate() {
             let dest_ok = p.destination().map(|d| self.paths.destination(d).exists()).unwrap_or(true);
+            let name = p.source_id();
             if reg.has_package(&r.checksum, &stream) && dest_ok {
+                stats.push(JobStat::new(name, r.checksum.clone(), r.compressed_size, State::Installed));
                 continue;
             }
             let archives = p.archives(r.compressed_size);
             let per = if archives.is_empty() { 0 } else { r.compressed_size / archives.len() as u64 };
             remaining_per_pkg[i] = archives.len();
             for a in archives {
-                jobs.push_back(Job { idx: i, archive: a, size: per });
+                stats.push(JobStat::new(name.clone(), a.clone(), per, State::Pending));
+                jobs.push_back(Job { idx: i, archive: a, size: per, stat: stats.len() - 1 });
             }
             if remaining_per_pkg[i] == 0 {
+                stats.push(JobStat::new(name, "-".into(), 0, State::Done));
                 // 내용 없는 패키지(디렉터리/특수 동작 전용)
                 if let Some(d) = p.destination() {
                     let root = self.paths.destination(d);
@@ -381,13 +423,14 @@ impl Runner {
         let n_jobs = jobs.len();
         log::info!("{} archives to install ({} bytes compressed)", n_jobs, total);
         if n_jobs == 0 {
+            self.write_status(&tr("Installing Autodesk Fusion"), 95.0, Some(status::snapshot(&stats)), false, None);
             return Ok(());
         }
 
         let pkg_cache = self.paths.cache.join("packages");
         fs::create_dir_all(&pkg_cache).map_err(|e| err("Access to install directories failed.", e))?;
         let queue = Mutex::new(jobs);
-        let downloaded = AtomicU64::new(0);
+        let downloaded = || stats.iter().filter(|s| s.state() != State::Installed).map(|s| s.got.load(Ordering::Relaxed)).sum::<u64>();
         let extracted = AtomicU64::new(0);
         let error: Mutex<Option<Fail>> = Mutex::new(None);
         let files_per_pkg: Vec<Mutex<Vec<String>>> = (0..packages.len()).map(|_| Mutex::new(vec![])).collect();
@@ -400,20 +443,22 @@ impl Runner {
             // 진행률 보고 스레드 (원본: 다운로드 5~85%, 설치 ~95%)
             s.spawn(|| {
                 while !finished.load(Ordering::Relaxed) {
-                    let d = downloaded.load(Ordering::Relaxed).min(total) as f64 / total as f64;
+                    let got = downloaded();
+                    let d = got.min(total) as f64 / total as f64;
                     let x = extracted.load(Ordering::Relaxed).min(total) as f64 / total as f64;
                     let pct = 5.0 + 90.0 * (0.7 * d + 0.3 * x);
                     let desc = if d < 0.999 {
                         format!(
                             "{}  ({:.0} / {:.0} MB)",
                             tr("Downloading Autodesk Fusion"),
-                            downloaded.load(Ordering::Relaxed) as f64 / 1048576.0,
+                            got as f64 / 1048576.0,
                             total as f64 / 1048576.0
                         )
                     } else {
                         tr("Installing Autodesk Fusion")
                     };
-                    self.ui.progress(3, 5, &desc, pct);
+                    self.progress(3, 5, &desc, pct);
+                    self.write_status(&desc, pct, Some(status::snapshot(&stats)), false, None);
                     std::thread::sleep(Duration::from_millis(400));
                 }
             });
@@ -427,13 +472,18 @@ impl Runner {
                         let pkg = &packages[job.idx];
                         let url = format!("{root}packages/{}.tar.xz", job.archive);
                         let file = pkg_cache.join(format!("{}.tar.xz", job.archive));
+                        let st = &stats[job.stat];
+                        st.set(State::Downloading);
                         let res = self
                             .net
-                            .download_verified(&url, &file, &job.archive, &downloaded)
+                            .download_verified(&url, &file, &job.archive, &st.got)
                             .map_err(Fail::from)
                             .and_then(|_| {
+                                st.size.store(st.got.load(Ordering::Relaxed), Ordering::Relaxed);
+                                st.set(State::Extracting);
                                 let dest = pkg.destination().map(|d| self.paths.destination(d)).ok_or_else(|| err("Missing files", "package has no destination"))?;
                                 let files = extract(&file, &dest).map_err(|e| err("Unable to Install", format!("{}: {e}", file.display())))?;
+                                st.files.store(files.len(), Ordering::Relaxed);
                                 files_per_pkg[job.idx].lock().unwrap().extend(files);
                                 if std::env::var_os("OFC_KEEP_PACKAGES").is_none() {
                                     let _ = fs::remove_file(&file);
@@ -442,12 +492,14 @@ impl Runner {
                             });
                         match res {
                             Ok(()) => {
+                                st.set(State::Done);
                                 extracted.fetch_add(job.size, Ordering::Relaxed);
                                 if remaining[job.idx].fetch_sub(1, Ordering::SeqCst) == 1 {
                                     completed.lock().unwrap().push(job.idx);
                                 }
                             }
                             Err(e) => {
+                                st.set(State::Failed);
                                 let mut g = error.lock().unwrap();
                                 if g.is_none() {
                                     *g = Some(e);
@@ -463,6 +515,7 @@ impl Runner {
             }
             finished.store(true, Ordering::Relaxed);
         });
+        self.write_status(&tr("Installing Autodesk Fusion"), 95.0, Some(status::snapshot(&stats)), false, None);
 
         // 완료된 패키지는 실패 여부와 무관하게 기록 → 재시도 시 이어서 설치
         for idx in completed.into_inner().unwrap() {
@@ -524,7 +577,7 @@ impl Runner {
     }
 
     fn spawn_fusion(&self, wine: &Wine, exe: &Path, args: &[String]) -> Result<(), Fail> {
-        self.ui.progress(5, 5, &tr("Starting Autodesk Fusion"), 100.0);
+        self.progress(5, 5, &tr("Starting Autodesk Fusion"), 100.0);
         let log = self.paths.logs.join("fusion-wine.log");
         wine.spawn_detached(exe, args, Some(&log)).map_err(|e| err("Fusion didn't launch for unknown reasons.", e))
     }
@@ -558,7 +611,7 @@ impl Runner {
                 return Err(Fail::Cancelled);
             }
         }
-        self.ui.progress(1, 3, &tr("Uninstalling"), 5.0);
+        self.progress(1, 3, &tr("Uninstalling"), 5.0);
         if let Some(w) = self.wine() {
             if self.paths.prefix.exists() {
                 w.kill_all();
@@ -578,7 +631,7 @@ impl Runner {
                 }
             }
             let _ = reg.remove_package(&p.checksum, &self.req.stream);
-            self.ui.progress(2, 3, &tr("Removing files"), 5.0 + 85.0 * (i + 1) as f64 / n as f64);
+            self.progress(2, 3, &tr("Removing files"), 5.0 + 85.0 * (i + 1) as f64 / n as f64);
         }
         let _ = reg.remove_application(&self.req.app_id, &self.req.stream);
         let _ = fs::remove_dir_all(self.paths.stream_dir());
@@ -590,7 +643,7 @@ impl Runner {
             let _ = fs::remove_file(&self.paths.registry_db);
             let _ = fs::remove_dir_all(&self.paths.cache);
         }
-        self.ui.progress(3, 3, &tr("Uninstall complete"), 100.0);
+        self.progress(3, 3, &tr("Uninstall complete"), 100.0);
         Ok(tr("Uninstall complete"))
     }
 
@@ -609,14 +662,14 @@ impl Runner {
     }
 
     fn clean_cache(&self) -> Result<String, Fail> {
-        self.ui.progress(1, 2, &tr("Cleaning cache"), 30.0);
+        self.progress(1, 2, &tr("Cleaning cache"), 30.0);
         if let Some(w) = self.wine() {
             if self.paths.prefix.exists() {
                 w.kill_all();
             }
         }
         let n = self.clean_cache_inner(self.req.cleancacheall, self.req.removeuserdata, self.req.removeusercred)?;
-        self.ui.progress(2, 2, &tr("Clean cache complete"), 100.0);
+        self.progress(2, 2, &tr("Clean cache complete"), 100.0);
         Ok(format!("{} ({n})", tr("Clean cache complete")))
     }
 
@@ -642,7 +695,7 @@ impl Runner {
     fn pull(&self) -> Result<String, Fail> {
         let dir = PathBuf::from(self.req.pull_dir.clone().unwrap_or_else(|| self.paths.cache.join("mirror").to_string_lossy().into_owned()));
         fs::create_dir_all(dir.join("packages")).map_err(|e| err("Access to install directories failed.", e))?;
-        self.ui.progress(1, 3, &tr("Pulling Installation Mirror"), 1.0);
+        self.progress(1, 3, &tr("Pulling Installation Mirror"), 1.0);
         let (app, _) = self.fetch_app(&self.req.app_id)?;
         let packages = self.fetch_packages(&app.packages)?;
         let app_dir = dir.join(PLATFORM_WINDOWS).join(&self.req.app_id);
@@ -656,7 +709,7 @@ impl Runner {
             for a in p.archives(r.compressed_size) {
                 self.net.download_verified(&format!("{root}packages/{a}.tar.xz"), &dir.join("packages").join(format!("{a}.tar.xz")), &a, &counter)?;
                 let pct = 5.0 + 95.0 * counter.load(Ordering::Relaxed) as f64 / total as f64;
-                self.ui.progress(2, 3, &tr("Pulling Installation Mirror"), pct);
+                self.progress(2, 3, &tr("Pulling Installation Mirror"), pct);
             }
         }
         Ok(format!("mirror: {} (use --conn file://{}/)", dir.display(), dir.display()))
