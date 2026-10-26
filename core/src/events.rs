@@ -102,8 +102,10 @@ impl Ui {
 
     pub fn send(&self, ev: Event) -> String {
         let _g = self.lock.lock().unwrap_or_else(|e| e.into_inner());
-        if let Ok(js) = serde_json::to_string(&ev) {
-            log::debug!("UI event: {}", js);
+        if !matches!(ev, Event::Progress { .. }) {
+            if let Ok(js) = serde_json::to_string(&ev) {
+                log::debug!("UI event: {}", js);
+            }
         }
         let r = self.sink.send(&ev);
         if ev.needs_response() {
