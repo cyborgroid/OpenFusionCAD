@@ -150,6 +150,15 @@ impl Net {
         Ok((s, etag))
     }
 
+    /// 재시도 없이 짧은 타임아웃으로 가져오기 (실행 전 업데이트 확인용 – 오프라인이면 즉시 포기)
+    pub fn get_quick(&self, url: &str) -> Option<String> {
+        let r = self.agent().get(url).timeout(Duration::from_secs(6)).call().ok()?;
+        if r.get_url().contains("/message/NotFound") {
+            return None;
+        }
+        r.into_string().ok()
+    }
+
     /// 간단한 연결 확인 (prechecks.CheckNetworkConnectivity)
     pub fn reachable(&self, url: &str) -> Result<(), String> {
         match self.agent().head(url).timeout(Duration::from_secs(15)).call() {

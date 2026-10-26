@@ -540,7 +540,7 @@ impl Runner {
         let reg = Registry::open(&self.paths.registry_db).ok()?;
         let inst = reg.application(&self.req.app_id, &self.req.stream)?;
         let old = AppManifest::parse(&inst.manifest).ok()?;
-        let (new, _) = self.fetch_app(&self.req.app_id).ok()?;
+        let new = AppManifest::parse(&self.net.get_quick(&self.manifest_url(&self.req.app_id))?).ok()?;
         (new.release_version != old.release_version).then(|| new.version())
     }
 
