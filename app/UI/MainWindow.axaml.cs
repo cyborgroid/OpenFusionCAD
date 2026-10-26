@@ -59,6 +59,8 @@ public partial class MainWindow : Window
         Opened += async (_, _) =>
         {
             Viewport.Focus();
+            int t = Array.IndexOf(args, "--autotest");
+            if (t >= 0 && t + 1 < args.Length) { await RunAutoTest(args[t + 1]); return; }
             var file = args.FirstOrDefault(a => !a.StartsWith('-') && File.Exists(a));
             if (file != null) await OpenPath(file);
             else await Regenerate();
