@@ -66,6 +66,9 @@ pub fn handle(line: &str, out: &mut impl Write) -> std::io::Result<()> {
             let mut meshes: Vec<(usize, MeshOut)> = vec![];
             let mut bodies = vec![];
             for (i, b) in st.bodies.iter().enumerate() {
+                if b.removed {
+                    continue;
+                }
                 match regen::mesh_body(&b.shape, tol) {
                     Ok(m) => {
                         bodies.push(json!({
@@ -100,7 +103,7 @@ pub fn handle(line: &str, out: &mut impl Write) -> std::io::Result<()> {
                 .bodies
                 .iter()
                 .enumerate()
-                .filter(|(i, _)| req.bodies.as_ref().map(|b| b.contains(i)).unwrap_or(true))
+                .filter(|(i, b)| !b.removed && req.bodies.as_ref().map(|x| x.contains(i)).unwrap_or(true))
                 .map(|(_, b)| &b.shape)
                 .collect();
             if shapes.is_empty() {

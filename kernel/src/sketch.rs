@@ -88,7 +88,7 @@ pub fn segments(entities: &[Entity]) -> Vec<Seg> {
             }
             Entity::Circle { c, r } if r > EPS => out.push(Seg::Circle { c, r }),
             Entity::Arc { a, m, b } => out.push(Seg::Arc { a, m, b }),
-            _ => {}
+            Entity::Construction { .. } | Entity::Point { .. } | Entity::Circle { .. } => {}
         }
     }
     out

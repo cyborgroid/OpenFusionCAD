@@ -12,6 +12,8 @@ pub struct Body {
     pub name: String,
     pub feature: String,
     pub shape: Shape,
+    /// 제거(삭제) 피처로 지워진 바디 – 번호는 유지하고 표시만 하지 않는다
+    pub removed: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -115,7 +117,25 @@ fn combine(shapes: Vec<Shape>) -> Shape {
     it.fold(first, |acc, s| acc.union(&s).into())
 }
 
+/// 평평한 면의 바깥쪽 법선. normal_at_center() 는 면 방향(reversed)을 이미 반영한다.
+/// (곡면에서는 투영이 정해지지 않아 터질 수 있으므로 평평한 면에만 사용)
+fn outward_normal(face: &Face) -> DVec3 {
+    face.normal_at_center()
+}
+
 impl State {
+    /// 현재 모델 크기(대각선 길이) – "전체" 범위 계산용
+    fn model_extent(&self) -> f64 {
+        let mut d: f64 = 0.0;
+        for b in self.bodies.iter().filter(|b| !b.removed) {
+            let bb = opencascade::bounding_box::aabb(&b.shape);
+            if !bb.is_void() {
+                d = d.max((bb.max() - bb.min()).length());
+            }
+        }
+        d
+    }
+
     fn apply(&mut self, f: &Feature, shape: Shape, op: Operation, target: Option<usize>) -> Result<(), String> {
         let tgt = target.or_else(|| self.bodies.len().checked_sub(1));
         match (op, tgt) {
@@ -124,16 +144,18 @@ impl State {
                     return Err("no body to cut/intersect".into());
                 }
                 let name = format!("Body{}", self.bodies.len() + 1);
-                self.bodies.push(Body { name, feature: f.id.clone(), shape });
+                self.bodies.push(Body { name, feature: f.id.clone(), shape, removed: false });
             }
             (_, Some(t)) => {
-                let b = self.bodies.get_mut(t).ok_or("target body does not exist")?;
-                b.shape = match op {
+                let b = self.bodies.get_mut(t).filter(|b| !b.removed).ok_or("target body does not exist")?;
+                let r: Shape = match op {
                     Operation::Join => b.shape.union(&shape).into(),
                     Operation::Cut => b.shape.subtract(&shape).into(),
                     Operation::Intersect => b.shape.intersect(&shape).into(),
                     Operation::New => unreachable!(),
                 };
+                // 같은 평면/곡면 위로 쪼개진 면과 모서리를 하나로 합친다 (Fusion 과 같은 결과 위상)
+                b.shape = r.clean();
             }
         }
         Ok(())
@@ -142,15 +164,20 @@ impl State {
     fn feature(&mut self, f: &Feature, sketches: &HashMap<String, (Frame, Vec<Entity>, Vec<Profile>)>) -> Result<(), String> {
         match &f.kind {
             FeatureKind::Sketch { .. } => Ok(()),
-            FeatureKind::Extrude { sketch, profiles, distance, distance2, direction, operation, target } => {
+            FeatureKind::Extrude { sketch, profiles, distance, distance2, direction, offset, extent, operation, target } => {
                 let (frame, _, all) = sketches.get(sketch).ok_or("sketch not found")?;
+                // 범위 "전체": 모델 크기보다 충분히 긴 거리 (부호는 방향 유지)
+                let through = extent.as_deref() == Some("all");
+                let big = self.model_extent() * 4.0 + 1000.0;
+                let distance = if through { if *distance < 0.0 { -big } else { big } } else { *distance };
+                let distance2 = if through && *direction == Direction::Two { big } else { *distance2 };
                 if distance.abs() < 1e-9 && *direction != Direction::Two {
                     return Err("distance must not be zero".into());
                 }
                 let (start, len) = match direction {
-                    Direction::One => (0.0, *distance),
-                    Direction::Symmetric => (-distance.abs() / 2.0, distance.abs()),
-                    Direction::Two => (-distance2, distance + distance2),
+                    Direction::One => (*offset, distance),
+                    Direction::Symmetric => (*offset - distance.abs() / 2.0, distance.abs()),
+                    Direction::Two => (*offset - distance2, distance + distance2),
                 };
                 let mut solids = vec![];
                 for p in pick(all, profiles)? {
@@ -192,6 +219,75 @@ impl State {
                 } else {
                     b.shape.chamfer_edges(*radius, chosen)
                 };
+                Ok(())
+            }
+            FeatureKind::PressPull { body, face, distance } => {
+                let b = self.bodies.get(*body).ok_or("body does not exist")?;
+                let face = b.shape.faces().nth(*face).ok_or("face does not exist")?;
+                if distance.abs() < 1e-9 {
+                    return Err("distance must not be zero".into());
+                }
+                let n = outward_normal(&face);
+                let op = if *distance > 0.0 { Operation::Join } else { Operation::Cut };
+                // 당기기(-)는 면에서 안쪽으로 잘라낸다
+                let tool: Shape = face.extrude(n * *distance).into();
+                self.apply(f, tool, op, Some(*body))
+            }
+            FeatureKind::Hole { body, origin, normal, diameter, depth, through } => {
+                if *diameter <= 0.0 {
+                    return Err("diameter must be positive".into());
+                }
+                let n = DVec3::from(*normal).normalize_or_zero();
+                if n == DVec3::ZERO {
+                    return Err("invalid hole direction".into());
+                }
+                let depth = if *through { self.model_extent() * 4.0 + 1000.0 } else { *depth };
+                if depth <= 0.0 {
+                    return Err("depth must be positive".into());
+                }
+                // 면에서 살짝 바깥쪽부터 잘라 경계면 문제를 피한다
+                let start = DVec3::from(*origin) + n * 0.01;
+                let tool = Shape::cylinder(start, diameter / 2.0, -n, depth + 0.01);
+                self.apply(f, tool, Operation::Cut, *body)
+            }
+            FeatureKind::Shell { body, faces, thickness } => {
+                if *thickness <= 0.0 {
+                    return Err("thickness must be positive".into());
+                }
+                let b = self.bodies.get_mut(*body).ok_or("body does not exist")?;
+                let all: Vec<Face> = b.shape.faces().collect();
+                let chosen: Vec<&Face> = faces.iter().filter_map(|i| all.get(*i)).collect();
+                // 안쪽으로 두께를 준다 (음수 오프셋)
+                b.shape = b.shape.hollow(-*thickness, chosen);
+                Ok(())
+            }
+            FeatureKind::Move { body, translate, axis, angle, pivot, copy } => {
+                let b = self.bodies.get(*body).ok_or("body does not exist")?;
+                let p = DVec3::from(*pivot);
+                let mut s = b.shape.translated(-p);
+                if angle.abs() > 1e-9 {
+                    let ax = DVec3::from(*axis).normalize_or_zero();
+                    if ax == DVec3::ZERO {
+                        return Err("invalid rotation axis".into());
+                    }
+                    s = s.rotated(ax, angle.to_radians());
+                }
+                s = s.translated(p + DVec3::from(*translate));
+                if *copy {
+                    let name = format!("Body{}", self.bodies.len() + 1);
+                    self.bodies.push(Body { name, feature: f.id.clone(), shape: s, removed: false });
+                } else {
+                    self.bodies[*body].shape = s;
+                }
+                Ok(())
+            }
+            FeatureKind::Remove { body } => {
+                if *body >= self.bodies.len() {
+                    return Err("body does not exist".into());
+                }
+                // 인덱스를 유지하도록 빈 형상으로 바꾼다 (이후 피처의 바디 번호가 바뀌지 않게)
+                self.bodies[*body].shape = Shape::empty();
+                self.bodies[*body].removed = true;
                 Ok(())
             }
             FeatureKind::Box { origin, size, operation, target } => {
