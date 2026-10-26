@@ -27,6 +27,8 @@ pub struct ProfileOut {
     pub outer: Vec<V2>,
     pub holes: Vec<Vec<V2>>,
     pub area: f64,
+    /// 영역 채우기용 삼각형 (월드 좌표 x,y,z 를 3개씩)
+    pub tris: Vec<f32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,22 +65,31 @@ impl Frame {
     }
 }
 
-fn wire_of(frame: &Frame, l: &sketch::Loop) -> Wire {
-    let edges: Vec<Edge> = l
-        .segs
+/// 루프 → 와이어. `ccw` 가 true 면 평면 법선 기준 반시계 방향으로 만든다.
+/// OCCT 는 면의 바깥 경계와 구멍 경계가 서로 반대 방향이어야 구멍으로 인식한다.
+fn wire_of(frame: &Frame, l: &sketch::Loop, ccw: bool) -> Wire {
+    let reverse = (l.area() >= 0.0) != ccw;
+    let mut segs = l.segs.clone();
+    if reverse {
+        segs.reverse();
+    }
+    let edges: Vec<Edge> = segs
         .iter()
         .map(|s| match *s {
+            Seg::Line { a, b } if reverse => Edge::segment(frame.p(b), frame.p(a)),
             Seg::Line { a, b } => Edge::segment(frame.p(a), frame.p(b)),
+            Seg::Arc { a, m, b } if reverse => Edge::arc(frame.p(b), frame.p(m), frame.p(a)),
             Seg::Arc { a, m, b } => Edge::arc(frame.p(a), frame.p(m), frame.p(b)),
-            Seg::Circle { c, r } => Edge::circle(frame.p(c), frame.n, r),
+            // 원은 법선 방향으로 회전 방향이 정해진다
+            Seg::Circle { c, r } => Edge::circle(frame.p(c), if ccw { frame.n } else { -frame.n }, r),
         })
         .collect();
     Wire::from_edges(edges.iter())
 }
 
 fn face_of(frame: &Frame, p: &Profile) -> Face {
-    let outer = wire_of(frame, &p.outer);
-    let holes: Vec<Wire> = p.holes.iter().map(|h| wire_of(frame, h)).collect();
+    let outer = wire_of(frame, &p.outer, true);
+    let holes: Vec<Wire> = p.holes.iter().map(|h| wire_of(frame, h, false)).collect();
     if holes.is_empty() {
         Face::from_wire(&outer)
     } else {
@@ -212,6 +223,17 @@ impl State {
     }
 }
 
+fn profile_tris(frame: &Frame, p: &Profile) -> Vec<f32> {
+    let shape: Shape = face_of(frame, p).into();
+    let Ok(m) = shape.mesh_with_tolerance(0.05) else { return vec![] };
+    let mut out = Vec::with_capacity(m.indices.len() * 3);
+    for i in &m.indices {
+        let v = m.vertices[*i];
+        out.extend([v.x as f32, v.y as f32, v.z as f32]);
+    }
+    out
+}
+
 /// 문서 → 바디 목록 (피처별 상태 포함)
 pub fn regenerate(doc: &Document) -> State {
     let mut st = State { bodies: vec![], status: vec![], sketches: vec![] };
@@ -230,7 +252,12 @@ pub fn regenerate(doc: &Document) -> State {
                         id: f.id.clone(),
                         profiles: profs
                             .iter()
-                            .map(|p| ProfileOut { outer: p.outer.poly.clone(), holes: p.holes.iter().map(|h| h.poly.clone()).collect(), area: p.outer.area().abs() })
+                            .map(|p| ProfileOut {
+                                outer: p.outer.poly.clone(),
+                                holes: p.holes.iter().map(|h| h.poly.clone()).collect(),
+                                area: p.outer.area().abs(),
+                                tris: profile_tris(&frame, p),
+                            })
                             .collect(),
                     });
                     sketches.insert(f.id.clone(), (frame, entities.clone(), profs));
@@ -272,10 +299,17 @@ pub fn mesh_body(shape: &Shape, tol: f64) -> Result<MeshOut, String> {
     for face in shape.faces() {
         m.face_start.push((m.indices.len() / 3) as u32);
         let fs: Shape = Shape::from(&face);
-        let fm = match fs.mesh_with_tolerance(tol) {
+        let mut fm = match fs.mesh_with_tolerance(tol) {
             Ok(x) => x,
             Err(_) => continue,
         };
+        // opencascade-rs 는 뒤집힌 면의 삼각형 순서만 바꾸고 법선은 곡면 기준 그대로 준다.
+        // 바깥쪽 법선이 되도록 뒤집는다.
+        if face.orientation() != opencascade::primitives::FaceOrientation::Forward {
+            for n in fm.normals.iter_mut() {
+                *n = -*n;
+            }
+        }
         let base = (m.positions.len() / 3) as u32;
         // normal_at_center() 는 무게중심을 곡면에 투영하는데, 원통 안쪽 면처럼 중심이 축 위에
         // 있으면 투영 해가 정해지지 않아 OCCT 가 Standard_OutOfRange 로 프로세스를 종료시킨다.
