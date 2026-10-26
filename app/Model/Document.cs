@@ -25,6 +25,7 @@ public sealed class Plane
 [JsonDerivedType(typeof(CircleEntity), "circle")]
 [JsonDerivedType(typeof(ArcEntity), "arc")]
 [JsonDerivedType(typeof(ConstructionEntity), "construction")]
+[JsonDerivedType(typeof(PointEntity), "point")]
 public abstract class Entity { }
 
 public sealed class LineEntity : Entity { public double[] A { get; set; } = [0, 0]; public double[] B { get; set; } = [0, 0]; }
@@ -32,6 +33,7 @@ public sealed class RectEntity : Entity { public double[] A { get; set; } = [0, 
 public sealed class CircleEntity : Entity { public double[] C { get; set; } = [0, 0]; public double R { get; set; } }
 public sealed class ArcEntity : Entity { public double[] A { get; set; } = [0, 0]; public double[] M { get; set; } = [0, 0]; public double[] B { get; set; } = [0, 0]; }
 public sealed class ConstructionEntity : Entity { public double[] A { get; set; } = [0, 0]; public double[] B { get; set; } = [0, 0]; }
+public sealed class PointEntity : Entity { public double[] P { get; set; } = [0, 0]; }
 
 public sealed class Axis
 {
@@ -50,6 +52,11 @@ public sealed class Axis
 [JsonDerivedType(typeof(CylinderFeature), "cylinder")]
 [JsonDerivedType(typeof(SphereFeature), "sphere")]
 [JsonDerivedType(typeof(ImportFeature), "import")]
+[JsonDerivedType(typeof(PressPullFeature), "presspull")]
+[JsonDerivedType(typeof(HoleFeature), "hole")]
+[JsonDerivedType(typeof(ShellFeature), "shell")]
+[JsonDerivedType(typeof(MoveFeature), "move")]
+[JsonDerivedType(typeof(RemoveFeature), "remove")]
 public abstract class Feature
 {
     public string Id { get; set; } = NewId();
@@ -82,6 +89,10 @@ public sealed class ExtrudeFeature : Feature, IBodyOp
     public double Distance2 { get; set; }
     /// "one" | "symmetric" | "two"
     public string Direction { get; set; } = "one";
+    /// 시작: 프로파일 평면에서 띄우는 거리 (0 = 프로파일 평면)
+    public double Offset { get; set; }
+    /// 범위 유형: "distance" | "all"
+    public string Extent { get; set; } = "distance";
     /// "new" | "join" | "cut" | "intersect"
     public string Operation { get; set; } = "new";
     public int? Target { get; set; }
@@ -152,12 +163,63 @@ public sealed class ImportFeature : Feature, IBodyOp
     public override string Kind => "Import";
 }
 
+/// 누르기/당기기 (평평한 면 간격띄우기)
+public sealed class PressPullFeature : Feature
+{
+    public int Body { get; set; }
+    public int Face { get; set; }
+    public double Distance { get; set; } = 5;
+    public override string Kind => "PressPull";
+}
+
+public sealed class HoleFeature : Feature
+{
+    public int? Body { get; set; }
+    public double[] Origin { get; set; } = [0, 0, 0];
+    public double[] Normal { get; set; } = [0, 0, 1];
+    public double Diameter { get; set; } = 5;
+    public double Depth { get; set; } = 10;
+    public bool Through { get; set; }
+    public override string Kind => "Hole";
+}
+
+public sealed class ShellFeature : Feature
+{
+    public int Body { get; set; }
+    public List<int> Faces { get; set; } = [];
+    public double Thickness { get; set; } = 1;
+    public override string Kind => "Shell";
+}
+
+public sealed class MoveFeature : Feature
+{
+    public int Body { get; set; }
+    public double[] Translate { get; set; } = [0, 0, 0];
+    public double[] Axis { get; set; } = [0, 0, 1];
+    public double Angle { get; set; }
+    public double[] Pivot { get; set; } = [0, 0, 0];
+    public bool Copy { get; set; }
+    public override string Kind => "Move";
+}
+
+public sealed class RemoveFeature : Feature
+{
+    public int Body { get; set; }
+    public override string Kind => "Remove";
+}
+
 public sealed class Document
 {
     public int Version { get; set; } = 1;
     public List<Feature> Features { get; set; } = [];
     /// 타임라인 마커 (앞에서부터 계산할 피처 수, null = 전부)
     public int? Marker { get; set; }
+    /// 바디 번호 → 모양(Appearance) 키 (커널은 무시)
+    public Dictionary<string, string> Appearances { get; set; } = [];
+    /// 숨긴 바디 번호 (검색기 전구)
+    public List<int> HiddenBodies { get; set; } = [];
+    /// 숨긴 스케치 id
+    public List<string> HiddenSketches { get; set; } = [];
 
     public static readonly JsonSerializerOptions Json = new()
     {
