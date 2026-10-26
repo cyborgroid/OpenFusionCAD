@@ -41,6 +41,8 @@ public partial class MainWindow : Window
     public MainWindow(string[] args)
     {
         InitializeComponent();
+        _marking = MarkingLayer;
+        BuildCommands();
         BuildAppBar();
         BuildToolbar();
         BuildNavBar();
@@ -53,7 +55,9 @@ public partial class MainWindow : Window
         HookCommandPanel();
         HookSketchPalette();
         HookCloud();
-        KeyDown += OnKeyDown;
+        HookShortcutBox();
+        HookTimelineMarkerDrag();
+        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         Closing += (_, e) => { if (_dirty && !_confirmedClose) { e.Cancel = true; _ = ConfirmClose(); } };
         Closed += (_, _) => _kernel.Dispose();
         Opened += async (_, _) =>
@@ -168,7 +172,8 @@ public partial class MainWindow : Window
         var bodyIds = r.Bodies.Select(b => b.Index).ToHashSet();
         Scene.SelectedEdges.RemoveWhere(e => !bodyIds.Contains(e.Body));
         Scene.SelectedFaces.RemoveWhere(e => !bodyIds.Contains(e.Body));
-        Scene.HiddenBodies.RemoveWhere(i => !bodyIds.Contains(i));
+        Scene.HiddenBodies = _doc.HiddenBodies.ToHashSet();
+        Scene.BodyColors = Scene.Bodies.ToDictionary(b => b.Index, b => Appearances.Color(_doc.Appearances.GetValueOrDefault(b.Index.ToString())));
 
         var prevVisible = Scene.Sketches.ToDictionary(s => s.Sketch.Id, s => s.Visible);
         Scene.Sketches = doc.Features.Take(doc.ActiveCount).OfType<SketchFeature>().Where(s => !s.Suppressed).Select(s => new SketchView
@@ -188,7 +193,10 @@ public partial class MainWindow : Window
         Viewport.Invalidate();
     }
 
-    readonly HashSet<string> _hiddenSketches = [];
+    /// 숨긴 스케치 (문서에 저장)
+    List<string> _hiddenSketches => _doc.HiddenSketches;
+
+    void HideSketch(string id) { if (!_doc.HiddenSketches.Contains(id)) _doc.HiddenSketches.Add(id); }
 
     // ------------------------------------------------------------------ 파일
 
@@ -334,156 +342,152 @@ public partial class MainWindow : Window
     }
     static List<string> Recent() => File.Exists(RecentFile) ? File.ReadAllLines(RecentFile).Where(File.Exists).ToList() : [];
 
-    // ------------------------------------------------------------------ 앱 바 / 툴바
+    // ------------------------------------------------------------------ 응용프로그램 막대
 
     void BuildAppBar()
     {
         DataPanelButton.Content = Icons.Make("grid", 20);
-        FileMenuButton.Content = Icons.Make("file", 20);
+        FileMenuButton.Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 1, Children = { Icons.Make("file", 18), new TextBlock { Text = "▾", FontSize = 9, VerticalAlignment = VerticalAlignment.Center } } };
         SaveButton.Content = Icons.Make("save", 20);
         UndoButton.Content = Icons.Make("undo", 20);
         RedoButton.Content = Icons.Make("redo", 20);
-        HelpButton.Content = Icons.Make("help", 20);
+        ExtensionsButton.Content = Icons.Make("extensions", 19);
+        JobStatusButton.Content = Icons.Make("jobstatus", 19);
+        NotifyButton.Content = Icons.Make("bell", 19);
+        HelpButton.Content = Icons.Make("help", 19);
+        DocTabIcon.Content = Icons.Make("body", 14);
         FinishIcon.Content = Icons.Make("finish", 16);
-        CloudIcon.Content = Icons.Make("cloud", 16);
+        CommandHelp.Content = Icons.Make("info", 18);
+        TimelineSettings.Content = Icons.Make("settings", 14);
         SaveButton.Click += async (_, _) => await Save();
         UndoButton.Click += async (_, _) => await Undo();
         RedoButton.Click += async (_, _) => await Redo();
         DataPanelButton.Click += (_, _) => ToggleDataPanel();
-        HelpButton.Click += (_, _) => ShowToast("단축키: L 선 · R 사각형 · C 원 · A 호 · E 돌출 · F 필렛 · Del 삭제 · Esc 취소 · Ctrl+Z/Y · 휠 확대 · 가운데 버튼 이동 · Shift+가운데/오른쪽 버튼 회전", 10);
+        NewTabButton.Click += async (_, _) => await NewDocument();
+        DocCloseButton.Click += async (_, _) => await NewDocument();
+        ExtensionsButton.Click += (_, _) => Run("scripts");
+        JobStatusButton.Click += (_, _) => ShowToast(_last?.Features.Any(f => !f.Ok) == true ? "계산 오류가 있는 피처가 있습니다. 타임라인의 빨간 아이콘을 확인하십시오." : "진행 중인 작업이 없습니다.");
+        NotifyButton.Click += (_, _) => ShowToast("새 알림이 없습니다.");
+        HelpButton.Click += (_, _) => ShowToast("S: 바로 가기 상자 · Q 누르기/당기기 · E 돌출 · H 구멍 · F 모깎기 · M 이동/복사 · I 측정 · A 모양 · V 가시성 · 스케치: L 선 · R 직사각형 · C 원 · D 치수 · X 구성 · 가운데 버튼 이동 · Shift+가운데 궤도 · 오른쪽 클릭 마킹 메뉴", 12);
+        CommentsToggle.Click += (_, _) => ShowToast("주석은 클라우드 공유 문서에서 사용할 수 있으며 다음 단계에서 구현됩니다.");
+        CommentsAdd.Click += (_, _) => ShowToast("주석은 다음 단계에서 구현됩니다.");
+        WorkspaceButton.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                new MenuItem { Header = "디자인", Icon = Icons.Make("finish", 14) },
+                new MenuItem { Header = "생성형 디자인", IsEnabled = false }, new MenuItem { Header = "렌더링", IsEnabled = false },
+                new MenuItem { Header = "애니메이션", IsEnabled = false }, new MenuItem { Header = "시뮬레이션", IsEnabled = false },
+                new MenuItem { Header = "제조", IsEnabled = false }, new MenuItem { Header = "도면", IsEnabled = false },
+            },
+        };
 
         FileMenuButton.Flyout = FileMenu;
         FileMenu.Opening += (_, _) =>
         {
-            var items = new List<MenuItem>
-            {
-                Item("새 디자인", async () => await NewDocument(), "Ctrl+N"),
-                Item("열기...", async () => await OpenDialog(), "Ctrl+O"),
-                Item("저장", async () => await Save(), "Ctrl+S"),
-                Item("다른 이름으로 저장...", async () => await Save(true)),
-            };
-            var recent = new MenuItem { Header = "최근 문서" };
-            foreach (var r in Recent()) recent.Items.Add(Item(Path.GetFileName(r), async () => { if (await ConfirmDiscard()) await OpenPath(r); }));
-            recent.IsEnabled = recent.Items.Count > 0;
-            items.Add(recent);
-            var exp = new MenuItem { Header = "내보내기" };
-            exp.Items.Add(Item("STEP (*.step)", async () => await Export("step")));
-            exp.Items.Add(Item("STL (*.stl)", async () => await Export("stl")));
-            exp.Items.Add(Item("IGES (*.igs)", async () => await Export("iges")));
-            exp.Items.Add(Item("OCCT BREP (*.brep)", async () => await Export("brep")));
-            items.Add(exp);
-            items.Add(Item("삽입 (STEP/IGES)...", async () => await InsertCad()));
             FileMenu.Items.Clear();
-            foreach (var it in items) FileMenu.Items.Add(it);
+            void Add(string header, Func<Task>? act, string? gesture = null)
+            {
+                var m = new MenuItem { Header = header, InputGesture = gesture != null ? KeyGesture.Parse(gesture) : null, IsEnabled = act != null };
+                if (act != null) m.Click += async (_, _) => await act();
+                FileMenu.Items.Add(m);
+            }
+            Add("새 디자인", NewDocument, "Ctrl+N");
+            Add("새 도면", null);
+            Add("열기...", OpenDialog, "Ctrl+O");
+            var recent = new MenuItem { Header = "최근 문서 열기" };
+            foreach (var r in Recent()) { var rr = r; var mi = new MenuItem { Header = Path.GetFileName(r) }; mi.Click += async (_, _) => { if (await ConfirmDiscard()) await OpenPath(rr); }; recent.Items.Add(mi); }
+            recent.IsEnabled = recent.Items.Count > 0;
+            FileMenu.Items.Add(recent);
+            FileMenu.Items.Add(new Separator());
+            Add("업로드", null);
+            Add("저장", async () => await Save(), "Ctrl+S");
+            Add("다른 이름으로 저장", async () => await Save(true), "Ctrl+Shift+S");
+            Add("내보내기...", ExportDialog);
+            Add("3D 인쇄", async () => await Export("stl"));
+            Add("이미지 캡처", null);
+            FileMenu.Items.Add(new Separator());
+            Add("CAD 파일 삽입 (STEP/IGES)...", InsertCad);
         };
-    }
-
-    static MenuItem Item(string header, Func<Task> action, string? gesture = null)
-    {
-        var m = new MenuItem { Header = header, InputGesture = gesture != null ? KeyGesture.Parse(gesture) : null };
-        m.Click += async (_, _) => await action();
-        return m;
     }
 
     readonly MenuFlyout FileMenu = new() { Placement = PlacementMode.BottomEdgeAlignedLeft };
     readonly MenuFlyout UserMenu = new() { Placement = PlacementMode.BottomEdgeAlignedRight };
 
-    string _tab = "solid";
-
-    void BuildToolbar()
+    /// Fusion 의 내보내기 대화상자: 유형 선택 후 저장 위치
+    async Task ExportDialog()
     {
-        TabStrip.Children.Clear();
-        var tabs = _mode == Mode.Sketch
-            ? new[] { ("sketch", "스케치") }
-            : new[] { ("solid", "솔리드"), ("surface", "곡면"), ("mesh", "메쉬"), ("sheet", "판금"), ("plastic", "플라스틱"), ("utilities", "유틸리티"), ("manage", "관리") };
-        foreach (var (key, label) in tabs)
-        {
-            var b = new Button { Content = label, Classes = { "tab" } };
-            if (key == (_mode == Mode.Sketch ? "sketch" : _tab)) b.Classes.Add(_mode == Mode.Sketch ? "sketch" : "active");
-            b.Click += (_, _) =>
-            {
-                if (key is "solid" or "utilities") { _tab = key; BuildToolbar(); }
-                else if (_mode != Mode.Sketch) ShowToast($"'{label}' 작업공간은 다음 단계에서 제공됩니다.");
-            };
-            TabStrip.Children.Add(b);
-        }
-
-        ToolGroups.Children.Clear();
-        _sketchToolButtons.Clear();
-        if (_mode == Mode.Sketch)
-        {
-            AddGroup("작성", [new("line", "선 (L)", () => SetSketchTool(SketchTool.Line), SketchTool.Line), new("rect", "2점 사각형 (R)", () => SetSketchTool(SketchTool.Rect), SketchTool.Rect),
-                new("circle", "중심 지름 원 (C)", () => SetSketchTool(SketchTool.Circle), SketchTool.Circle), new("arc", "3점 호 (A)", () => SetSketchTool(SketchTool.Arc), SketchTool.Arc),
-                new("construction", "작도선", () => SetSketchTool(SketchTool.Construction), SketchTool.Construction)]);
-            AddGroup("수정", [new("trim", "선택 항목 삭제 (Del)", () => DeleteSelectedEntities())]);
-            AddGroup("선택", [new("select", "선택 (Esc)", () => SetSketchTool(SketchTool.Select), SketchTool.Select)]);
-            AddGroup("스케치 마치기", [new("finish", "스케치 마치기", () => ExitSketch(true))]);
-            return;
-        }
-        if (_tab == "utilities")
-        {
-            AddGroup("내보내기", [new("export", "STEP 내보내기", () => _ = Export("step")), new("export", "STL 내보내기", () => _ = Export("stl"))]);
-            AddGroup("삽입", [new("insert", "STEP/IGES 삽입", () => _ = InsertCad())]);
-            return;
-        }
-        AddGroup("작성", [new("sketch", "스케치 작성", () => StartSketchPick()), new("extrude", "돌출 (E)", () => StartCommand("extrude")),
-            new("revolve", "회전", () => StartCommand("revolve")), new("box", "상자", () => StartCommand("box")),
-            new("cylinder", "원통", () => StartCommand("cylinder")), new("sphere", "구", () => StartCommand("sphere"))]);
-        AddGroup("수정", [new("fillet", "모깎기 (F)", () => StartCommand("fillet")), new("chamfer", "모따기", () => StartCommand("chamfer"))]);
-        AddGroup("구성", [new("plane", "원점 평면 표시", () => { Scene.ShowOrigin = !Scene.ShowOrigin; Viewport.Invalidate(); })]);
-        AddGroup("검사", [new("measure", "측정", () => Measure())]);
-        AddGroup("삽입", [new("insert", "STEP/IGES 삽입", () => _ = InsertCad())]);
-        AddGroup("선택", [new("select", "선택", () => { CancelCommand(); Scene.ClearSelection(); Viewport.Invalidate(); })]);
+        if (Scene.Bodies.Count == 0) { ShowToast("내보낼 바디가 없습니다."); return; }
+        var choice = await Dialogs.Ask(this, "내보내기", "유형을 선택하십시오. (선택한 바디가 있으면 그 바디만 내보냅니다)", "STEP 파일 (*.step)", "STL 파일 (*.stl)", "IGES 파일 (*.igs)", "OCCT BREP (*.brep)", "취소");
+        string? fmt = choice switch { 0 => "step", 1 => "stl", 2 => "iges", 3 => "brep", _ => null };
+        if (fmt != null) await Export(fmt);
     }
 
-    readonly Dictionary<SketchTool, Button> _sketchToolButtons = [];
-
-    record ToolDef(string Icon, string Tip, Action Act, SketchTool? Tool = null);
-
-    void AddGroup(string title, ToolDef[] tools)
+    async Task ComputeAll()
     {
-        var icons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 1, HorizontalAlignment = HorizontalAlignment.Center };
-        foreach (var t in tools)
-        {
-            var b = new Button { Classes = { "tool" }, Content = Icons.Make(t.Icon, 26) };
-            ToolTip.SetTip(b, t.Tip);
-            b.Click += (_, _) => { t.Act(); Viewport.Focus(); };
-            icons.Children.Add(b);
-            if (t.Tool is { } st) _sketchToolButtons[st] = b;
-        }
-        var label = new Button { Classes = { "group" }, Content = $"{title} ▾" };
-        var flyout = new MenuFlyout();
-        foreach (var t in tools) { var mi = new MenuItem { Header = t.Tip }; mi.Click += (_, _) => t.Act(); flyout.Items.Add(mi); }
-        label.Flyout = flyout;
-        var group = new StackPanel { Spacing = 0, Margin = new Thickness(6, 0) };
-        group.Children.Add(icons);
-        group.Children.Add(label);
-        ToolGroups.Children.Add(group);
-        ToolGroups.Children.Add(new Border { Width = 1, Background = new SolidColorBrush(Color.Parse("#E1E4E8")), Margin = new Thickness(0, 4) });
+        await Regenerate();
+        ShowToast("모두 계산했습니다.", 2);
     }
 
-    // ------------------------------------------------------------------ 탐색 막대
+    // ------------------------------------------------------------------ 탐색 막대 (Fusion 순서)
 
-    enum NavMode { None, Orbit, Pan }
+    enum NavMode { None, Orbit, Pan, Zoom }
     NavMode _nav = NavMode.None;
     readonly Dictionary<NavMode, Button> _navButtons = [];
+    public enum VisualStyle { ShadedEdges, Shaded, Wireframe }
 
     void BuildNavBar()
     {
-        void Add(string icon, string tip, Action act, NavMode? mode = null)
+        Button Add(string icon, string tip, Action? act, NavMode? mode = null, MenuFlyout? flyout = null)
         {
-            var b = new Button { Classes = { "nav" }, Content = Icons.Make(icon, 18) };
+            var content = flyout == null ? Icons.Make(icon, 18) : (Control)new StackPanel { Orientation = Orientation.Horizontal, Children = { Icons.Make(icon, 18), new TextBlock { Text = "▾", FontSize = 8, VerticalAlignment = VerticalAlignment.Bottom } } };
+            var b = new Button { Classes = { "nav" }, Content = content, Width = flyout == null ? 30 : 38 };
             ToolTip.SetTip(b, tip);
-            b.Click += (_, _) => { act(); Viewport.Focus(); };
+            if (act != null) b.Click += (_, _) => { act(); Viewport.Focus(); };
+            if (flyout != null) b.Flyout = flyout;
             if (mode != null) _navButtons[mode.Value] = b;
             NavButtons.Children.Add(b);
+            return b;
         }
-        Add("orbit", "궤도 (왼쪽 드래그로 회전)", () => SetNav(_nav == NavMode.Orbit ? NavMode.None : NavMode.Orbit), NavMode.Orbit);
-        Add("pan", "초점 이동", () => SetNav(_nav == NavMode.Pan ? NavMode.None : NavMode.Pan), NavMode.Pan);
-        Add("zoom", "확대", () => { Cam.Zoom(0.7f, Cam.Width / 2, Cam.Height / 2); Viewport.Invalidate(); });
-        Add("fit", "맞춤", () => { var (a, b) = Scene.Bounds(); Cam.Fit(a, b); Viewport.Invalidate(); });
-        Add("display", "투영 전환 (원근/직교)", () => { Cam.Ortho = !Cam.Ortho; ShowToast(Cam.Ortho ? "직교 투영" : "원근 투영", 2); Viewport.Invalidate(); });
-        Add("grid", "그리드 표시", () => { Scene.ShowGrid = !Scene.ShowGrid; Viewport.Invalidate(); });
+        void Sep() => NavButtons.Children.Add(new Border { Width = 1, Background = new SolidColorBrush(Color.Parse("#D3D6DB")), Margin = new Thickness(3, 4) });
+
+        Add("orbit", "궤도 (Shift + 가운데 버튼)", () => SetNav(_nav == NavMode.Orbit ? NavMode.None : NavMode.Orbit), NavMode.Orbit);
+        Add("lookat", "다음 보기", LookAtSelection);
+        Sep();
+        Add("pan", "초점이동 (가운데 버튼)", () => SetNav(_nav == NavMode.Pan ? NavMode.None : NavMode.Pan), NavMode.Pan);
+        Add("zoom", "줌 (휠)", () => SetNav(_nav == NavMode.Zoom ? NavMode.None : NavMode.Zoom), NavMode.Zoom);
+        Add("fit", "맞춤 (F6)", FitView);
+        Sep();
+        var display = new MenuFlyout();
+        var style = new MenuItem { Header = "비주얼 스타일" };
+        foreach (var (vs, label) in new[] { (VisualStyle.ShadedEdges, "모서리가 있는 음영처리"), (VisualStyle.Shaded, "음영처리"), (VisualStyle.Wireframe, "와이어프레임") })
+        {
+            var mi = new MenuItem { Header = label };
+            mi.Click += (_, _) => { Scene.Style = vs; Viewport.Invalidate(); };
+            style.Items.Add(mi);
+        }
+        display.Items.Add(style);
+        var cam = new MenuItem { Header = "카메라" };
+        var ortho = new MenuItem { Header = "직교" }; ortho.Click += (_, _) => { Cam.Ortho = true; Viewport.Invalidate(); };
+        var persp = new MenuItem { Header = "원근" }; persp.Click += (_, _) => { Cam.Ortho = false; Viewport.Invalidate(); };
+        cam.Items.Add(ortho); cam.Items.Add(persp);
+        display.Items.Add(cam);
+        var vis = new MenuItem { Header = "객체 가시성" };
+        var o1 = new MenuItem { Header = "원점" }; o1.Click += (_, _) => { Scene.ShowOrigin = !Scene.ShowOrigin; RebuildBrowser(); Viewport.Invalidate(); };
+        var o2 = new MenuItem { Header = "스케치" }; o2.Click += (_, _) => { foreach (var s in Scene.Sketches) s.Visible = !s.Visible; Viewport.Invalidate(); };
+        vis.Items.Add(o1); vis.Items.Add(o2);
+        display.Items.Add(vis);
+        display.Items.Add(new MenuItem { Header = "환경", IsEnabled = false });
+        display.Items.Add(new MenuItem { Header = "효과", IsEnabled = false });
+        Add("display", "화면표시 설정", null, flyout: display);
+        var grid = new MenuFlyout();
+        var lg = new MenuItem { Header = "레이아웃 그리드" }; lg.Click += (_, _) => { Scene.ShowGrid = !Scene.ShowGrid; Viewport.Invalidate(); };
+        var sg = new MenuItem { Header = "그리드에 스냅" }; sg.Click += (_, _) => { SnapGrid.IsChecked = SnapGrid.IsChecked != true; ShowToast(SnapGrid.IsChecked == true ? "그리드 스냅 켜짐" : "그리드 스냅 꺼짐", 2); };
+        grid.Items.Add(lg); grid.Items.Add(sg);
+        grid.Items.Add(new MenuItem { Header = "증분 이동", IsEnabled = false });
+        Add("gridsnap", "그리드 및 스냅", null, flyout: grid);
+        var vpf = new MenuFlyout { Items = { new MenuItem { Header = "단일 뷰" }, new MenuItem { Header = "다중 뷰", IsEnabled = false } } };
+        Add("viewports", "뷰포트", null, flyout: vpf);
     }
 
     void SetNav(NavMode m)
@@ -492,41 +496,65 @@ public partial class MainWindow : Window
         foreach (var (k, b) in _navButtons) b.Classes.Set("checked", k == m);
     }
 
-    void Measure()
+    void FitView()
     {
-        if (Scene.Bodies.Count == 0) { ShowToast("측정할 바디가 없습니다."); return; }
-        var lines = Scene.Bodies.Select(b =>
-            $"{b.Name}: {b.BBox[3] - b.BBox[0]:0.##} × {b.BBox[4] - b.BBox[1]:0.##} × {b.BBox[5] - b.BBox[2]:0.##} mm (면 {b.FaceCount}, 모서리 {b.EdgeCount})");
-        ShowToast(string.Join("\n", lines), 8);
+        var (a, b) = Scene.Bounds();
+        Cam.Fit(a, b);
+        Viewport.Invalidate();
     }
 
-    // ------------------------------------------------------------------ 키보드
-
-    async void OnKeyDown(object? sender, KeyEventArgs e)
+    /// 다음 보기: 선택한 평평한 면(또는 활성 스케치 평면)을 정면에서 본다
+    void LookAtSelection()
     {
-        if (e.Source is TextBox && e.Key is not (Key.Escape)) return;
-        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        switch (e.Key)
+        if (_mode == Mode.Sketch && ActiveSketch is { } sk)
         {
-            case Key.Z when ctrl: await Undo(); e.Handled = true; return;
-            case Key.Y when ctrl: await Redo(); e.Handled = true; return;
-            case Key.S when ctrl: await Save(e.KeyModifiers.HasFlag(KeyModifiers.Shift)); e.Handled = true; return;
-            case Key.O when ctrl: await OpenDialog(); e.Handled = true; return;
-            case Key.N when ctrl: await NewDocument(); e.Handled = true; return;
+            var f = new Sketching.Frame(sk.Plane);
+            Cam.LookFrom(f.N, f.To3(f.To2(Cam.Target).X, f.To2(Cam.Target).Y));
         }
-        if (ctrl) return;
-        if (_mode == Mode.Sketch) { if (SketchKey(e)) e.Handled = true; return; }
-        switch (e.Key)
+        else if (Scene.SelectedFaces.FirstOrDefault() is var fr && Scene.SelectedFaces.Count > 0 && IsPlanar(fr))
         {
-            case Key.Escape:
-                if (_mode == Mode.Command) CancelCommand();
-                else if (_mode == Mode.PickSketchPlane) EndSketchPick();
-                else { Scene.ClearSelection(); Viewport.Invalidate(); }
-                e.Handled = true; break;
-            case Key.Enter when _mode == Mode.Command: await OkCommand(); e.Handled = true; break;
-            case Key.E: StartCommand("extrude"); e.Handled = true; break;
-            case Key.F: StartCommand("fillet"); e.Handled = true; break;
-            case Key.Delete when _selectedFeature != null: await DeleteFeature(_selectedFeature); e.Handled = true; break;
+            var pl = PlaneOfFace(fr);
+            Cam.LookFrom(new Vector3((float)pl.Normal[0], (float)pl.Normal[1], (float)pl.Normal[2]), new Vector3((float)pl.Origin[0], (float)pl.Origin[1], (float)pl.Origin[2]));
         }
+        else { ShowToast("다음 보기: 평평한 면을 선택하십시오."); return; }
+        Viewport.Invalidate();
+    }
+
+    /// V: 선택한 바디의 표시/숨기기 전환
+    void ToggleVisibility()
+    {
+        if (Scene.SelectedBodies.Count == 0 && Scene.SelectedFaces.Count == 0) { ShowToast("표시/숨길 바디를 선택하십시오."); return; }
+        var bodies = Scene.SelectedBodies.Concat(Scene.SelectedFaces.Select(f => f.Body)).Distinct().ToList();
+        foreach (var b in bodies)
+            if (!_doc.HiddenBodies.Remove(b)) _doc.HiddenBodies.Add(b);
+        Scene.HiddenBodies = _doc.HiddenBodies.ToHashSet();
+        Scene.ClearSelection();
+        _dirty = true; UpdateTitle();
+        RebuildBrowser();
+        Viewport.Invalidate();
+    }
+
+    void FindInBrowser()
+    {
+        var b = Scene.SelectedBodies.Concat(Scene.SelectedFaces.Select(f => f.Body)).FirstOrDefault(-1);
+        if (b < 0) { ShowToast("찾을 바디를 선택하십시오."); return; }
+        _browserHighlightBody = b;
+        _bodiesExpanded = true;
+        RebuildBrowser();
+    }
+
+    /// Delete: 캔버스에서 선택한 바디를 삭제(제거 피처), 아니면 선택한 타임라인 피처 삭제
+    async Task DeleteSelection()
+    {
+        var bodies = Scene.SelectedBodies.Concat(Scene.SelectedFaces.Select(f => f.Body)).Concat(Scene.SelectedEdges.Select(e => e.Body)).Distinct().ToList();
+        if (bodies.Count > 0)
+        {
+            Snapshot();
+            foreach (var b in bodies) InsertFeature(new RemoveFeature { Name = _doc.NextName("Remove"), Body = b });
+            Scene.ClearSelection();
+            await Commit($"바디 {bodies.Count}개를 삭제했습니다.");
+            return;
+        }
+        if (_selectedFeature != null) await DeleteFeature(_selectedFeature);
     }
 }

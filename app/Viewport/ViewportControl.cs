@@ -228,8 +228,8 @@ void main(){ frag = vec4(vC, 1.0); }";
         var view = Camera.View;
         var vp = Camera.ViewProj;
 
-        if (Scene.ShowGrid) DrawGrid(vp);
-        if (Scene.ShowOrigin) DrawAxes(vp);
+        if (Scene.ShowGrid) { DrawGrid(vp); DrawGridAxes(vp); }
+        if (Scene.ShowOrigin) { DrawAxes(vp); DrawOriginPlanes(vp, subtle: true); }
 
         // 바디 음영 (모서리가 위에 보이도록 polygon offset)
         gl.UseProgram(_litProg);
@@ -242,9 +242,13 @@ void main(){ frag = vec4(vC, 1.0); }";
             if (Scene.HiddenBodies.Contains(b.Index)) continue;
             var (vao, _, _, _, count) = _bodyBuffers[i];
             gl.BindVertexArray(vao);
-            var color = Scene.SelectedBodies.Contains(b.Index) ? Vector4.Lerp(BodyColor, Accent, 0.55f) : BodyColor;
+            if (Scene.Style == UI.MainWindow.VisualStyle.Wireframe) continue;
+            var baseColor = Scene.BodyColors.TryGetValue(b.Index, out var bc) ? bc : BodyColor;
+            var color = Scene.SelectedBodies.Contains(b.Index) ? Vector4.Lerp(baseColor, Accent, 0.55f) with { W = baseColor.W } : baseColor;
+            if (color.W < 1) gl.DepthMask(false);
             SetColor(_uLitColor, color);
             unsafe { gl.DrawElements(PrimitiveType.Triangles, (uint)count, DrawElementsType.UnsignedInt, (void*)0); }
+            gl.DepthMask(true);
             // 면 하이라이트
             foreach (var fr in Scene.SelectedFaces.Where(f => f.Body == b.Index)) DrawFace(b, fr.Face, Vector4.Lerp(BodyColor, Accent, 0.75f));
             if (Scene.HoverFace is { } hf && hf.Body == b.Index && !Scene.SelectedFaces.Contains(hf)) DrawFace(b, hf.Face, Vector4.Lerp(BodyColor, HoverAccent, 0.55f));
@@ -255,7 +259,7 @@ void main(){ frag = vec4(vC, 1.0); }";
         foreach (var b in Scene.Bodies)
         {
             if (Scene.HiddenBodies.Contains(b.Index)) continue;
-            DrawLines(b.Edges, vp, EdgeColor);
+            if (Scene.Style != UI.MainWindow.VisualStyle.Shaded) DrawLines(b.Edges, vp, Scene.Style == UI.MainWindow.VisualStyle.Wireframe ? new Vector4(0.15f, 0.2f, 0.3f, 1) : EdgeColor);
             var sel = new List<float>(); var hov = new List<float>();
             for (int k = 0; k < b.EdgeIds.Length; k++)
             {
@@ -267,6 +271,7 @@ void main(){ frag = vec4(vC, 1.0); }";
             if (hov.Count > 0) DrawThick(hov.ToArray(), vp, HoverAccent);
         }
 
+        if (Scene.Manipulator is { } mp) DrawManipulator(vp, mp.origin, mp.dir, mp.length, mp.hot);
         if (Scene.ExtraSelected.Length > 0) DrawThick(Scene.ExtraSelected, vp, Accent);
         if (Scene.ExtraHover.Length > 0) DrawThick(Scene.ExtraHover, vp, HoverAccent);
 
@@ -397,7 +402,15 @@ void main(){ frag = vec4(vC, 1.0); }";
         DrawLines([0, 0, 0, 0, 0, len], vp, new Vector4(0.15f, 0.35f, 0.90f, 1));
     }
 
-    void DrawOriginPlanes(Matrix4x4 vp)
+    /// Fusion 처럼 그리드 위에 X(빨강)·Y(초록) 축선을 표시
+    void DrawGridAxes(Matrix4x4 vp)
+    {
+        float len = GridStep() * 40;
+        DrawLines([-len, 0, 0, len, 0, 0], vp, new Vector4(0.85f, 0.25f, 0.25f, 0.55f));
+        DrawLines([0, -len, 0, 0, len, 0], vp, new Vector4(0.25f, 0.65f, 0.25f, 0.55f));
+    }
+
+    void DrawOriginPlanes(Matrix4x4 vp, bool subtle = false)
     {
         float size = Picking.OriginPlaneSize * Camera.Distance / 200;
         foreach (var (name, plane) in new[] { ("XY", Plane.XY), ("XZ", Plane.XZ), ("YZ", Plane.YZ) })
@@ -405,7 +418,7 @@ void main(){ frag = vec4(vC, 1.0); }";
             var f = new Frame(plane);
             var a = f.To3(0, 0); var b = f.To3(size, 0); var c = f.To3(size, size); var d = f.To3(0, size);
             bool hover = Scene.HoverPlane == name;
-            var fill = hover ? new Vector4(1.0f, 0.62f, 0.15f, 0.55f) : new Vector4(1.0f, 0.70f, 0.30f, 0.28f);
+            var fill = hover ? new Vector4(1.0f, 0.62f, 0.15f, 0.55f) : new Vector4(1.0f, 0.70f, 0.30f, subtle ? 0.10f : 0.28f);
             DrawTris([a.X, a.Y, a.Z, b.X, b.Y, b.Z, c.X, c.Y, c.Z, a.X, a.Y, a.Z, c.X, c.Y, c.Z, d.X, d.Y, d.Z], vp, fill);
             var edge = new List<float>(); Add(edge, a, b); Add(edge, b, c); Add(edge, c, d); Add(edge, d, a);
             DrawLines(edge.ToArray(), vp, new Vector4(0.85f, 0.45f, 0.05f, hover ? 1 : 0.7f));
@@ -468,6 +481,30 @@ void main(){ frag = vec4(vC, 1.0); }";
                 }
             }
         }
+    }
+
+    /// 돌출 거리 조작기: 기준점에서 방향으로 화살표 (Fusion 의 파란 화살표)
+    void DrawManipulator(Matrix4x4 vp, Vector3 o, Vector3 dir, float length, bool hot)
+    {
+        var tip = o + dir * length;
+        var color = hot ? new Vector4(0.35f, 0.75f, 0.95f, 1) : Accent;
+        DrawThick([o.X, o.Y, o.Z, tip.X, tip.Y, tip.Z], vp, color, 1.0f);
+        // 원뿔 화살촉
+        float h = Camera.PixelSize * 22, r = Camera.PixelSize * 7;
+        var side = Vector3.Normalize(Vector3.Cross(dir, MathF.Abs(dir.Z) < 0.9f ? Vector3.UnitZ : Vector3.UnitX));
+        var up = Vector3.Cross(dir, side);
+        var tris = new List<float>();
+        var apex = tip + dir * h * MathF.Sign(length == 0 ? 1 : length);
+        for (int i = 0; i < 16; i++)
+        {
+            float a0 = i * MathF.Tau / 16, a1 = (i + 1) * MathF.Tau / 16;
+            var p0 = tip + (side * MathF.Cos(a0) + up * MathF.Sin(a0)) * r;
+            var p1 = tip + (side * MathF.Cos(a1) + up * MathF.Sin(a1)) * r;
+            tris.AddRange([apex.X, apex.Y, apex.Z, p0.X, p0.Y, p0.Z, p1.X, p1.Y, p1.Z]);
+        }
+        _gl!.Disable(EnableCap.DepthTest);
+        DrawTris(tris.ToArray(), vp, color);
+        _gl.Enable(EnableCap.DepthTest);
     }
 
     static void Square(List<float> l, Frame f, Vector2 p, float s)

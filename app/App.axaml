@@ -13,6 +13,15 @@
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.appbar:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#D9DDE3" /></Style>
+    <Style Selector="Button.appbar.wide"><Setter Property="Width" Value="40" /></Style>
+    <Style Selector="Button.avatar">
+      <Setter Property="Width" Value="28" /><Setter Property="Height" Value="28" /><Setter Property="Padding" Value="0" /><Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Background" Value="#5B6B7F" /><Setter Property="BorderThickness" Value="0" /><Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="Margin" Value="4,0,0,0" />
+    </Style>
+    <Style Selector="Button.avatar.signedin"><Setter Property="Background" Value="#0696D7" /></Style>
+    <Style Selector="Button.tabclose"><Setter Property="Padding" Value="3,0" /><Setter Property="MinHeight" Value="16" /><Setter Property="FontSize" Value="10" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Foreground" Value="#5B616B" /></Style>
+    <Style Selector="Button.newtab"><Setter Property="Padding" Value="8,2" /><Setter Property="FontSize" Value="15" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Foreground" Value="#3A3F47" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
     <Style Selector="Button.user">
       <Setter Property="Height" Value="28" /><Setter Property="Padding" Value="6,2" /><Setter Property="CornerRadius" Value="14" />
       <Setter Property="Background" Value="#FFFFFF" /><Setter Property="BorderBrush" Value="#C9CDD3" /><Setter Property="BorderThickness" Value="1" />

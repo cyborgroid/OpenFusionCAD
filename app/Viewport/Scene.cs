@@ -24,6 +24,11 @@ public sealed class SketchView
 public sealed class Scene
 {
     public List<BodyMesh> Bodies = [];
+    /// 바디별 모양 색 (RGBA, A<1 이면 반투명)
+    public Dictionary<int, Vector4> BodyColors = [];
+    public UI.MainWindow.VisualStyle Style = UI.MainWindow.VisualStyle.ShadedEdges;
+    /// 캔버스 조작기(돌출 거리 화살표): 기준점, 방향, 길이
+    public (Vector3 origin, Vector3 dir, float length, bool hot)? Manipulator;
     public HashSet<int> HiddenBodies = [];
     public List<SketchView> Sketches = [];
 
@@ -51,7 +56,7 @@ public sealed class Scene
     /// 스케치 평면 선택 모드: 원점 평면 표시
     public bool ShowOriginPlanes;
     public string? HoverPlane;
-    public bool ShowOrigin = true;
+    public bool ShowOrigin = false; // Fusion: 원점 전구 기본 꺼짐
     public bool ShowGrid = true;
 
     /// 바디가 바뀌면 증가 → GPU 버퍼 재업로드

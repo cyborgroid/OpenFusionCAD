@@ -67,8 +67,6 @@ public sealed class MarkingMenu : Canvas
         IsVisible = true;
     }
 
-    Border Pill((string, string, Action) _1, string icon, Action act) => throw new NotSupportedException();
-
     Border Pill(string label, string icon, Action act)
     {
         var sp = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
