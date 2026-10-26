@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-openfusioncad">
+    <comment>OpenFusionCAD design</comment>
+    <comment xml:lang="ko">OpenFusionCAD 디자인</comment>
+    <glob pattern="*.ofcd"/>
+    <icon name="openfusioncad"/>
+  </mime-type>
+</mime-info>

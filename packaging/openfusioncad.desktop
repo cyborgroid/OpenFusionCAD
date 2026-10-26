@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=OpenFusionCAD
+GenericName=Parametric 3D CAD
+GenericName[ko]=파라메트릭 3D CAD
+Comment=Sketch, extrude, revolve, fillet and export STEP/STL
+Comment[ko]=스케치·돌출·회전·모깎기 기반 3D 모델링, STEP/STL 내보내기
+Exec=@BIN@ %f
+Icon=openfusioncad
+Terminal=false
+Categories=Graphics;Engineering;3DGraphics;
+MimeType=application/x-openfusioncad;model/step;application/step;
+Keywords=CAD;3D;STEP;STL;modeling;
+StartupWMClass=openfusioncad

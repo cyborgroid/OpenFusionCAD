@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- OpenFusionCAD 앱 아이콘: 등각 큐브 + 스케치 곡선 (독자 디자인) -->
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="#1F2933"/>
+  <path d="M128 44 L208 88 L128 132 L48 88 Z" fill="#5FB3E8"/>
+  <path d="M48 88 L128 132 L128 220 L48 176 Z" fill="#2F7FD8"/>
+  <path d="M128 132 L208 88 L208 176 L128 220 Z" fill="#1C5FA8"/>
+  <path d="M84 92 Q128 60 172 92" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="84" cy="92" r="9" fill="#F2C744"/>
+  <circle cx="172" cy="92" r="9" fill="#F2C744"/>
+</svg>
