@@ -1,0 +1,99 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="OpenFusionCAD.App"
+             RequestedThemeVariant="Light">
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="Window"><Setter Property="FontFamily" Value="Noto Sans CJK KR, Noto Sans KR, DejaVu Sans, sans-serif" /></Style>
+
+    <!-- 앱 바 -->
+    <Style Selector="Button.appbar">
+      <Setter Property="Width" Value="32" /><Setter Property="Height" Value="30" /><Setter Property="Padding" Value="4" />
+      <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="CornerRadius" Value="4" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.appbar:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#D9DDE3" /></Style>
+    <Style Selector="Button.appbar.wide"><Setter Property="Width" Value="40" /></Style>
+    <Style Selector="Button.avatar">
+      <Setter Property="Width" Value="28" /><Setter Property="Height" Value="28" /><Setter Property="Padding" Value="0" /><Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Background" Value="#5B6B7F" /><Setter Property="BorderThickness" Value="0" /><Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="Margin" Value="4,0,0,0" />
+    </Style>
+    <Style Selector="Button.avatar.signedin"><Setter Property="Background" Value="#0696D7" /></Style>
+    <Style Selector="Button.tabclose"><Setter Property="Padding" Value="3,0" /><Setter Property="MinHeight" Value="16" /><Setter Property="FontSize" Value="10" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Foreground" Value="#5B616B" /></Style>
+    <Style Selector="Button.newtab"><Setter Property="Padding" Value="8,2" /><Setter Property="FontSize" Value="15" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Foreground" Value="#3A3F47" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="Button.user">
+      <Setter Property="Height" Value="28" /><Setter Property="Padding" Value="6,2" /><Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Background" Value="#FFFFFF" /><Setter Property="BorderBrush" Value="#C9CDD3" /><Setter Property="BorderThickness" Value="1" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.cloud"><Setter Property="Padding" Value="8,3" /><Setter Property="CornerRadius" Value="12" /><Setter Property="Background" Value="#F7F8FA" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="Border.doctab">
+      <Setter Property="Background" Value="#FAFAFB" /><Setter Property="BorderBrush" Value="#D3D6DB" /><Setter Property="BorderThickness" Value="1,1,1,0" />
+      <Setter Property="CornerRadius" Value="4,4,0,0" /><Setter Property="Padding" Value="14,7" /><Setter Property="Margin" Value="0,0,0,-1" />
+    </Style>
+
+    <!-- 툴바 -->
+    <Style Selector="Button.workspace"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Padding" Value="6,4" /></Style>
+    <Style Selector="Button.tab">
+      <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0,0,0,2" /><Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="0" /><Setter Property="Padding" Value="12,3" /><Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="#5B616B" /><Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.tab.active"><Setter Property="BorderBrush" Value="#0696D7" /><Setter Property="Foreground" Value="#0B6FA4" /></Style>
+    <Style Selector="Button.tab.sketch"><Setter Property="BorderBrush" Value="#0696D7" /><Setter Property="Foreground" Value="#0B6FA4" /></Style>
+    <Style Selector="Button.tool">
+      <Setter Property="Width" Value="40" /><Setter Property="Height" Value="36" /><Setter Property="Padding" Value="4" />
+      <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="1" /><Setter Property="BorderBrush" Value="Transparent" /><Setter Property="CornerRadius" Value="3" />
+    </Style>
+    <Style Selector="Button.tool:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#E4F2FA" /><Setter Property="BorderBrush" Value="#9FD1EC" /></Style>
+    <Style Selector="Button.tool.checked /template/ ContentPresenter"><Setter Property="Background" Value="#CDE8F7" /><Setter Property="BorderBrush" Value="#0696D7" /></Style>
+    <Style Selector="Button.group">
+      <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Padding" Value="4,0" />
+      <Setter Property="FontSize" Value="10.5" /><Setter Property="Foreground" Value="#4A5059" /><Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+
+    <!-- 떠 있는 패널 -->
+    <Style Selector="Border.floating">
+      <Setter Property="Background" Value="#F9FFFFFF" /><Setter Property="BorderBrush" Value="#C9CDD3" /><Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="3" /><Setter Property="BoxShadow" Value="0 2 8 0 #33000000" />
+    </Style>
+    <Style Selector="Border.panelhead"><Setter Property="Background" Value="#EEF0F3" /><Setter Property="Padding" Value="8,4" /><Setter Property="BorderBrush" Value="#DDE0E4" /><Setter Property="BorderThickness" Value="0,0,0,1" /></Style>
+    <Style Selector="TextBlock.panelhead"><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="#3A3F47" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="ToggleButton.mini, Button.mini"><Setter Property="Padding" Value="6,0" /><Setter Property="MinHeight" Value="18" /><Setter Property="FontSize" Value="11" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="ToggleButton.mini:checked /template/ ContentPresenter, ToggleButton.mini:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="#3A3F47" /></Style>
+    <Style Selector="Border.cmdhead"><Setter Property="Background" Value="#3A3F47" /><Setter Property="Padding" Value="10,6" /><Setter Property="CornerRadius" Value="3,3,0,0" /></Style>
+    <Style Selector="TextBlock.cmdtitle"><Setter Property="Foreground" Value="White" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="FontSize" Value="12" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="TextBlock.rowlabel"><Setter Property="FontSize" Value="12" /><Setter Property="Foreground" Value="#3A3F47" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#0696D7" /><Setter Property="Foreground" Value="White" /><Setter Property="Padding" Value="18,4" /><Setter Property="CornerRadius" Value="2" />
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#0A84BD" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="Button.secondary"><Setter Property="Background" Value="#FFFFFF" /><Setter Property="BorderBrush" Value="#B8BDC4" /><Setter Property="BorderThickness" Value="1" /><Setter Property="Padding" Value="14,4" /><Setter Property="CornerRadius" Value="2" /></Style>
+    <Style Selector="Button.finish"><Setter Property="Background" Value="#E7F5EC" /><Setter Property="BorderBrush" Value="#2E9E5B" /><Setter Property="BorderThickness" Value="1" /><Setter Property="Foreground" Value="#1E6B3D" /><Setter Property="CornerRadius" Value="2" /></Style>
+    <Style Selector="Border.dimbox"><Setter Property="Background" Value="White" /><Setter Property="BorderBrush" Value="#0696D7" /><Setter Property="BorderThickness" Value="1" /><Setter Property="Padding" Value="2" /></Style>
+    <Style Selector="Border.navbar"><Setter Property="Background" Value="#F2FFFFFF" /><Setter Property="BorderBrush" Value="#C9CDD3" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="3" /><Setter Property="Padding" Value="3" /></Style>
+    <Style Selector="Button.nav"><Setter Property="Width" Value="30" /><Setter Property="Height" Value="28" /><Setter Property="Padding" Value="4" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="1" /><Setter Property="BorderBrush" Value="Transparent" /></Style>
+    <Style Selector="Button.nav.checked /template/ ContentPresenter"><Setter Property="Background" Value="#CDE8F7" /><Setter Property="BorderBrush" Value="#0696D7" /></Style>
+    <Style Selector="Border.toast"><Setter Property="Background" Value="#E6303540" /><Setter Property="CornerRadius" Value="3" /><Setter Property="Padding" Value="10,6" /></Style>
+    <Style Selector="Border.datapanel"><Setter Property="Background" Value="White" /><Setter Property="BorderBrush" Value="#C9CDD3" /><Setter Property="BorderThickness" Value="0,0,1,0" /><Setter Property="BoxShadow" Value="4 0 12 0 #40000000" /></Style>
+    <Style Selector="Button.darkmini"><Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="White" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Padding" Value="6,2" /></Style>
+
+    <!-- 검색기 트리 / 타임라인 -->
+    <Style Selector="Border.treerow"><Setter Property="Padding" Value="2,1" /><Setter Property="CornerRadius" Value="2" /><Setter Property="Background" Value="Transparent" /></Style>
+    <Style Selector="Border.treerow:pointerover"><Setter Property="Background" Value="#E4F2FA" /></Style>
+    <Style Selector="Button.eye"><Setter Property="Width" Value="22" /><Setter Property="Height" Value="20" /><Setter Property="Padding" Value="2" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="Button.tl">
+      <Setter Property="Width" Value="30" /><Setter Property="Height" Value="30" /><Setter Property="Padding" Value="3" />
+      <Setter Property="Background" Value="#FFFFFF" /><Setter Property="BorderBrush" Value="#C9CDD3" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="3" />
+    </Style>
+    <Style Selector="Button.tl.selected /template/ ContentPresenter"><Setter Property="BorderBrush" Value="#0696D7" /><Setter Property="Background" Value="#E4F2FA" /></Style>
+    <Style Selector="Button.tl.failed /template/ ContentPresenter"><Setter Property="BorderBrush" Value="#D64545" /><Setter Property="Background" Value="#FDECEC" /></Style>
+    <Style Selector="Button.tl.rolled"><Setter Property="Opacity" Value="0.38" /></Style>
+    <Style Selector="Button.tl.suppressed"><Setter Property="Opacity" Value="0.5" /></Style>
+    <Style Selector="Button.tlc"><Setter Property="Width" Value="26" /><Setter Property="Height" Value="26" /><Setter Property="Padding" Value="5" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="Border.datarow"><Setter Property="Padding" Value="6,5" /><Setter Property="CornerRadius" Value="3" /><Setter Property="Background" Value="Transparent" /><Setter Property="Cursor" Value="Hand" /></Style>
+    <Style Selector="Border.datarow:pointerover"><Setter Property="Background" Value="#E4F2FA" /></Style>
+  </Application.Styles>
+</Application>

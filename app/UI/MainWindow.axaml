@@ -1,0 +1,229 @@
+<!--
+  Fusion 360 디자인 작업공간과 같은 화면 배치
+  - 응용프로그램 막대: 데이터 패널 · 파일 ▾ · 저장 · 명령 취소/복구 | 문서 탭(✕, +) | 확장 · 작업 상태 · 알림 · 도움말 · 사용자
+  - 툴바: 작업공간(디자인 ▾) + 탭 + 명령 그룹(그룹 이름 ▾)
+  - 캔버스: 검색기(왼쪽 위) · 주석(왼쪽 아래) · ViewCube(오른쪽 위) · 명령 대화상자/스케치 팔레트(오른쪽) · 탐색 막대(아래 가운데)
+  - 타임라인(맨 아래)
+-->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vp="using:OpenFusionCAD.Viewport"
+        xmlns:ui="using:OpenFusionCAD.UI"
+        x:Class="OpenFusionCAD.UI.MainWindow"
+        Title="OpenFusionCAD"
+        Width="1440" Height="900" MinWidth="960" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="#F3F4F6">
+  <Grid RowDefinitions="40,Auto,*,40">
+
+    <!-- ===== 응용프로그램 막대 ===== -->
+    <Border Grid.Row="0" Background="#E9EBEE" BorderBrush="#D3D6DB" BorderThickness="0,0,0,1">
+      <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="2" Margin="6,0">
+          <Button x:Name="DataPanelButton" Classes="appbar" ToolTip.Tip="데이터 패널 표시" />
+          <Button x:Name="FileMenuButton" Classes="appbar wide" ToolTip.Tip="파일" />
+          <Button x:Name="SaveButton" Classes="appbar" ToolTip.Tip="저장 (Ctrl+S)" />
+          <Border Width="1" Background="#C9CDD3" Margin="4,9" />
+          <Button x:Name="UndoButton" Classes="appbar" ToolTip.Tip="명령 취소 (Ctrl+Z)" />
+          <Button x:Name="RedoButton" Classes="appbar" ToolTip.Tip="명령 복구 (Ctrl+Y)" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" Margin="6,0">
+          <Button x:Name="ExtensionsButton" Classes="appbar" ToolTip.Tip="확장" />
+          <Button x:Name="JobStatusButton" Classes="appbar" ToolTip.Tip="작업 상태" />
+          <Button x:Name="NotifyButton" Classes="appbar" ToolTip.Tip="알림" />
+          <Button x:Name="HelpButton" Classes="appbar" ToolTip.Tip="도움말" />
+          <Button x:Name="UserButton" Classes="avatar" ToolTip.Tip="사용자 프로필">
+            <TextBlock x:Name="UserInitials" Text="?" FontSize="11.5" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Button>
+        </StackPanel>
+        <!-- 문서 탭 -->
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="24,0,0,0" Spacing="2">
+          <Border Classes="doctab">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <ContentControl x:Name="DocTabIcon" />
+              <TextBlock x:Name="DocTitle" Text="제목 없음" FontSize="12.5" VerticalAlignment="Center" Foreground="#2B2F36" />
+              <TextBlock x:Name="DirtyMark" Text="●" FontSize="9" Foreground="#0696D7" VerticalAlignment="Center" IsVisible="False" />
+              <Button x:Name="DocCloseButton" Classes="tabclose" Content="✕" ToolTip.Tip="닫기" />
+            </StackPanel>
+          </Border>
+          <Button x:Name="NewTabButton" Classes="newtab" Content="+" ToolTip.Tip="새 디자인" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- ===== 툴바 ===== -->
+    <Border Grid.Row="1" Background="#FAFAFB" BorderBrush="#D3D6DB" BorderThickness="0,0,0,1">
+      <DockPanel>
+        <Border DockPanel.Dock="Left" BorderBrush="#DDE0E4" BorderThickness="0,0,1,0" Padding="10,0">
+          <Button x:Name="WorkspaceButton" Classes="workspace" VerticalAlignment="Center" ToolTip.Tip="작업공간 전환">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="디자인" FontWeight="SemiBold" FontSize="13" Foreground="#2B2F36" />
+              <TextBlock Text="▾" FontSize="11" Foreground="#5B616B" />
+            </StackPanel>
+          </Button>
+        </Border>
+        <StackPanel>
+          <StackPanel x:Name="TabStrip" Orientation="Horizontal" Spacing="0" Margin="8,4,0,0" />
+          <StackPanel x:Name="ToolGroups" Orientation="Horizontal" Margin="4,2,0,4" Spacing="0" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- ===== 캔버스 ===== -->
+    <Panel Grid.Row="2" x:Name="CanvasArea" ClipToBounds="True">
+      <vp:ViewportControl x:Name="Viewport" Focusable="True" />
+      <Canvas x:Name="Overlay" IsHitTestVisible="False" />
+      <!-- 창/교차 선택 사각형 -->
+      <Border x:Name="SelectionRect" IsVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" BorderThickness="1" />
+
+      <!-- 검색기 -->
+      <Border x:Name="BrowserPanel" Classes="floating" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Width="260">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Classes="panelhead">
+            <DockPanel>
+              <ToggleButton x:Name="BrowserCollapse" DockPanel.Dock="Left" Classes="mini" Content="▾" IsChecked="True" />
+              <TextBlock Text="검색기" Classes="panelhead" />
+            </DockPanel>
+          </Border>
+          <ScrollViewer x:Name="BrowserScroll" MaxHeight="440" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="BrowserTree" Margin="2,4,2,6" />
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <!-- 주석 -->
+      <Border x:Name="CommentsPanel" Classes="floating" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,10" Width="260">
+        <DockPanel>
+          <ToggleButton x:Name="CommentsToggle" DockPanel.Dock="Left" Classes="mini" Content="▸" />
+          <Button x:Name="CommentsAdd" DockPanel.Dock="Right" Classes="mini" Content="+" ToolTip.Tip="주석 추가" />
+          <TextBlock Text="주석" Classes="panelhead" Margin="2,4" />
+        </DockPanel>
+      </Border>
+
+      <vp:ViewCube x:Name="Cube" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,10,0" />
+
+      <!-- 명령 대화상자 -->
+      <Border x:Name="CommandPanel" Classes="floating" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,136,16,0" Width="310" IsVisible="False">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Classes="cmdhead">
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Left" Text="▸" Foreground="#AEB4BD" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ContentControl x:Name="CommandIcon" />
+                <TextBlock x:Name="CommandTitle" Classes="cmdtitle" />
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <Border DockPanel.Dock="Bottom" BorderBrush="#E1E4E8" BorderThickness="0,1,0,0" Padding="10,8">
+            <DockPanel>
+              <TextBlock x:Name="CommandError" DockPanel.Dock="Top" Foreground="#C62828" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6" IsVisible="False" />
+              <ContentControl x:Name="CommandHelp" DockPanel.Dock="Left" VerticalAlignment="Center" ToolTip.Tip="이 명령에 대해 자세히" />
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
+                <Button x:Name="CommandOk" Classes="primary" Content="확인" />
+                <Button x:Name="CommandCancel" Classes="secondary" Content="취소" />
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <Grid x:Name="CommandRows" ColumnDefinitions="100,*" Margin="10,8" RowSpacing="6" />
+        </DockPanel>
+      </Border>
+
+      <!-- 스케치 팔레트 -->
+      <Border x:Name="SketchPalette" Classes="floating" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,136,16,0" Width="230" IsVisible="False">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Classes="cmdhead"><TextBlock Text="스케치 팔레트" Classes="cmdtitle" /></Border>
+          <StackPanel Margin="10,6" Spacing="3">
+            <TextBlock Text="옵션" FontWeight="SemiBold" FontSize="11.5" Foreground="#3A3F47" Margin="0,2,0,2" />
+            <DockPanel>
+              <TextBlock Text="선종류" FontSize="12" VerticalAlignment="Center" />
+              <Button x:Name="LinetypeButton" DockPanel.Dock="Right" Classes="mini" HorizontalAlignment="Right" ToolTip.Tip="보통/구성 (X)" />
+            </DockPanel>
+            <DockPanel>
+              <TextBlock Text="다음 보기" FontSize="12" VerticalAlignment="Center" />
+              <Button x:Name="PaletteLookAt" DockPanel.Dock="Right" Classes="mini" HorizontalAlignment="Right" ToolTip.Tip="스케치 평면을 정면으로" />
+            </DockPanel>
+            <CheckBox x:Name="SketchGrid" Content="스케치 그리드" IsChecked="True" FontSize="12" />
+            <CheckBox x:Name="SnapGrid" Content="스냅" IsChecked="True" FontSize="12" />
+            <CheckBox x:Name="SnapPoints" Content="점에 스냅" IsChecked="True" FontSize="12" />
+            <CheckBox x:Name="ShowProfile" Content="프로파일 표시" IsChecked="True" FontSize="12" />
+            <CheckBox x:Name="ShowPoints" Content="점 표시" IsChecked="True" FontSize="12" />
+            <CheckBox x:Name="ShowDims" Content="치수 표시" IsChecked="True" FontSize="12" />
+            <CheckBox x:Name="ShowConstraints" Content="구속조건 표시" IsChecked="True" FontSize="12" IsEnabled="False" />
+            <TextBlock x:Name="SketchHint" FontSize="11" Foreground="#5B616B" TextWrapping="Wrap" Margin="0,4" />
+            <Button x:Name="FinishSketchButton" Classes="finish" HorizontalAlignment="Stretch">
+              <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                <ContentControl x:Name="FinishIcon" />
+                <TextBlock Text="스케치 마침" VerticalAlignment="Center" FontWeight="SemiBold" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <!-- 치수/값 입력 상자 (스케치 치수, 조작기 값) -->
+      <Border x:Name="DimBox" Classes="dimbox" IsVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top">
+        <TextBox x:Name="DimInput" Width="96" FontSize="12" Watermark="값 입력 후 Enter" />
+      </Border>
+      <Border x:Name="ManipBox" Classes="dimbox" IsVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top">
+        <TextBox x:Name="ManipInput" Width="86" FontSize="12" />
+      </Border>
+
+      <!-- 탐색 막대 -->
+      <Border x:Name="NavBar" Classes="navbar" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10">
+        <StackPanel x:Name="NavButtons" Orientation="Horizontal" Spacing="1" />
+      </Border>
+
+      <Border x:Name="Toast" Classes="toast" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,58" IsVisible="False">
+        <TextBlock x:Name="ToastText" Foreground="White" FontSize="12" TextWrapping="Wrap" MaxWidth="560" />
+      </Border>
+
+      <!-- 바로 가기 상자 (S) -->
+      <Border x:Name="ShortcutBox" Classes="floating" IsVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top" Width="320">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Classes="cmdhead"><TextBlock Text="디자인 바로 가기" Classes="cmdtitle" /></Border>
+          <TextBox x:Name="ShortcutSearch" DockPanel.Dock="Top" Margin="8" Watermark="명령 검색" />
+          <ListBox x:Name="ShortcutList" MaxHeight="260" Margin="4,0,4,6" />
+        </DockPanel>
+      </Border>
+
+      <ui:MarkingMenu x:Name="MarkingLayer" />
+
+      <!-- 데이터 패널 -->
+      <Border x:Name="DataPanel" Classes="datapanel" HorizontalAlignment="Left" Width="320" IsVisible="False">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Background="#2B2F36" Padding="12,10">
+            <DockPanel>
+              <Button x:Name="DataPanelClose" DockPanel.Dock="Right" Classes="darkmini" Content="✕" />
+              <StackPanel>
+                <TextBlock Text="데이터 패널" Foreground="White" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock x:Name="DataAccount" Text="로그인하지 않음" Foreground="#AEB4BD" FontSize="11" />
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <Border DockPanel.Dock="Top" Background="#F1F3F5" Padding="8,6">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button x:Name="DataBack" Classes="secondary" Content="◀" Padding="8,2" />
+              <Button x:Name="DataUpload" Classes="secondary" Content="업로드" Padding="8,2" IsEnabled="False" ToolTip.Tip="다음 단계에서 구현" />
+              <Button x:Name="DataNewFolder" Classes="secondary" Content="새 폴더" Padding="8,2" IsEnabled="False" ToolTip.Tip="다음 단계에서 구현" />
+            </StackPanel>
+          </Border>
+          <TextBlock x:Name="DataPath" DockPanel.Dock="Top" Margin="10,6" FontSize="11" Foreground="#5B616B" TextTrimming="CharacterEllipsis" />
+          <ScrollViewer>
+            <StackPanel x:Name="DataList" Margin="6" Spacing="2" />
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Panel>
+
+    <!-- ===== 타임라인 ===== -->
+    <Border Grid.Row="3" Background="#ECEEF1" BorderBrush="#D3D6DB" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <StackPanel x:Name="TimelineControls" DockPanel.Dock="Left" Orientation="Horizontal" Margin="8,0" Spacing="2" VerticalAlignment="Center" />
+        <Button x:Name="TimelineSettings" DockPanel.Dock="Right" Classes="tlc" Margin="0,0,8,0" ToolTip.Tip="타임라인 설정" />
+        <ScrollViewer x:Name="TimelineScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <StackPanel x:Name="Timeline" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2" Margin="4,0" />
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>

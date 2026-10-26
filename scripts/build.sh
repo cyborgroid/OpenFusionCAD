@@ -1,50 +1,38 @@
 #!/usr/bin/env bash
-# OpenFusionCAD 빌드: Rust 엔진 + C# GUI → dist/openfusioncad, dist/openfusioncad_<ver>_amd64.deb
-#   --self-contained : .NET 런타임을 포함해 배포 (대상 PC 에 .NET 불필요)
+# OpenFusionCAD 빌드: Rust 형상 커널 + C# GUI → dist/openfusioncad/, dist/openfusioncad_<ver>_amd64.deb
+#   --framework-dependent : .NET 런타임을 포함하지 않음 (대상 PC 에 dotnet-runtime 필요)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="1.0.0"
-SC=false
-[ "${1:-}" = "--self-contained" ] && SC=true
-CARGO="${CARGO:-$(command -v cargo)}"; [ -x "$HOME/.cargo/bin/cargo" ] && CARGO="$HOME/.cargo/bin/cargo"
+VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$ROOT/app/OpenFusionCAD.csproj")"
+SC=true
+[ "${1:-}" = "--framework-dependent" ] && SC=false
+CARGO="$(command -v cargo || true)"; [ -x "$HOME/.cargo/bin/cargo" ] && CARGO="$HOME/.cargo/bin/cargo"
+[ -n "$CARGO" ] || { echo "Rust(cargo)가 필요합니다: https://rustup.rs" >&2; exit 1; }
+command -v dotnet >/dev/null || { echo ".NET SDK 8 이상이 필요합니다" >&2; exit 1; }
 OUT="$ROOT/dist/openfusioncad"
 
-[ -f "$ROOT/resources/precheck_config.json" ] || "$ROOT/scripts/extract-assets.sh"
+echo "==> 형상 커널 (Rust + OpenCASCADE, 첫 빌드는 OCCT 컴파일로 오래 걸림)"
+"$CARGO" build --release --manifest-path "$ROOT/Cargo.toml" -p ofc-kernel
 
-echo "==> Rust 엔진 빌드"
-"$CARGO" build --release --manifest-path "$ROOT/Cargo.toml"
-
-echo "==> C# GUI 빌드"
+echo "==> GUI (C# Avalonia)"
 rm -rf "$OUT"; mkdir -p "$OUT"
-dotnet publish "$ROOT/gui/FusionClientDownloader.csproj" -c Release -r linux-x64 \
-  --self-contained "$SC" -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
-  -o "$OUT" >/dev/null
+dotnet publish "$ROOT/app/OpenFusionCAD.csproj" -c Release -r linux-x64 --self-contained "$SC" \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "$OUT" >/dev/null
 rm -f "$OUT"/*.pdb
+cp "$ROOT/target/release/ofc-kernel" "$OUT/"
+cp "$ROOT/packaging/openfusioncad.svg" "$ROOT/packaging/openfusioncad-mime.xml" "$OUT/"
+sed "s#@BIN@#/opt/openfusioncad/openfusioncad#" "$ROOT/packaging/openfusioncad.desktop" > "$OUT/openfusioncad.desktop"
 
-cp "$ROOT/target/release/ofc-streamer" "$ROOT/target/release/libofc_core.so" "$OUT/"
-cp -r "$ROOT/resources" "$OUT/resources"
-"$OUT/ofc-streamer" export-icon "$ROOT/resources/Fusion.ico" "$OUT/resources/fusion-client-downloader.png"
-
-cat > "$OUT/fusion-client-downloader.desktop" <<DESK
-[Desktop Entry]
-Type=Application
-Name=Fusion Client Downloader
-Name[ko]=Fusion 클라이언트 다운로더
-Comment=Install, update and launch Autodesk Fusion on Linux
-Exec=/opt/openfusioncad/FusionClientDownloader %U
-Icon=/opt/openfusioncad/resources/fusion-client-downloader.png
-Terminal=false
-Categories=Graphics;Engineering;
-DESK
-
-echo "==> .deb 패키지"
+echo "==> .deb"
 PKG="$ROOT/dist/deb"; rm -rf "$PKG"
-mkdir -p "$PKG/DEBIAN" "$PKG/opt" "$PKG/usr/share/applications" "$PKG/usr/bin"
+mkdir -p "$PKG/DEBIAN" "$PKG/opt" "$PKG/usr/bin" "$PKG/usr/share/applications" \
+         "$PKG/usr/share/icons/hicolor/scalable/apps" "$PKG/usr/share/mime/packages"
 cp -r "$OUT" "$PKG/opt/openfusioncad"
-cp "$OUT/fusion-client-downloader.desktop" "$PKG/usr/share/applications/"
-ln -s /opt/openfusioncad/ofc-streamer "$PKG/usr/bin/ofc-streamer"
-ln -s /opt/openfusioncad/FusionClientDownloader "$PKG/usr/bin/fusion-client-downloader"
-DEPS="wine (>= 9.0) | wine-stable (>= 9.0) | winehq-stable, xdg-utils, libvulkan1"
+ln -s /opt/openfusioncad/openfusioncad "$PKG/usr/bin/openfusioncad"
+cp "$OUT/openfusioncad.desktop" "$PKG/usr/share/applications/"
+cp "$OUT/openfusioncad.svg" "$PKG/usr/share/icons/hicolor/scalable/apps/"
+cp "$OUT/openfusioncad-mime.xml" "$PKG/usr/share/mime/packages/openfusioncad.xml"
+DEPS="libc6 (>= 2.35), libstdc++6, libgl1, libx11-6, libice6, libsm6, libfontconfig1, xdg-utils"
 $SC || DEPS="$DEPS, dotnet-runtime-10.0 | dotnet-runtime-9.0 | dotnet-runtime-8.0"
 cat > "$PKG/DEBIAN/control" <<CTRL
 Package: openfusioncad
@@ -53,13 +41,21 @@ Section: graphics
 Priority: optional
 Architecture: amd64
 Depends: $DEPS
-Recommends: mesa-vulkan-drivers, fonts-noto-cjk
+Recommends: fonts-noto-cjk
 Maintainer: OpenFusionCAD <noreply@localhost>
-Description: Linux-native Fusion Client Downloader (C#/Rust)
- Reimplementation of the Autodesk Fusion streaming installer for Ubuntu.
- Downloads Fusion from the official Autodesk CDN, installs it into a
- dedicated Wine prefix and keeps Autodesk account sign-in working.
+Description: Parametric 3D CAD for Ubuntu (C#/Rust, OpenCASCADE)
+ Sketch-based solid modeling with a feature timeline: extrude, revolve,
+ fillet, chamfer, primitives, STEP/IGES import and STEP/STL/IGES export.
+ Optional sign-in with an Autodesk account (APS) to open cloud files.
 CTRL
+cat > "$PKG/DEBIAN/postinst" <<'POST'
+#!/bin/sh
+set -e
+command -v update-mime-database >/dev/null && update-mime-database /usr/share/mime || true
+command -v update-desktop-database >/dev/null && update-desktop-database /usr/share/applications || true
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+POST
+chmod 755 "$PKG/DEBIAN/postinst"
 dpkg-deb --root-owner-group --build "$PKG" "$ROOT/dist/openfusioncad_${VERSION}_amd64.deb" >/dev/null
 rm -rf "$PKG"
 echo "완료:"

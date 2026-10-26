@@ -41,6 +41,8 @@ pub enum Entity {
     Arc { a: V2, m: V2, b: V2 },
     /// 작도선 – 프로파일에서 제외, 회전축 등으로 사용
     Construction { a: V2, b: V2 },
+    /// 스케치 점 (스냅·구멍 위치용, 형상에는 영향 없음)
+    Point { p: V2 },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -90,6 +92,12 @@ pub enum FeatureKind {
         distance2: f64,
         #[serde(default)]
         direction: Direction,
+        /// 시작: 프로파일 평면에서 법선 방향으로 띄우는 거리
+        #[serde(default)]
+        offset: f64,
+        /// 범위: "distance" | "all" (전체 – 모델을 관통)
+        #[serde(default)]
+        extent: Option<String>,
         #[serde(default)]
         operation: Operation,
         #[serde(default)]
@@ -136,6 +144,38 @@ pub enum FeatureKind {
         #[serde(default)]
         target: Option<usize>,
     },
+    /// 누르기/당기기: 바디의 평평한 면을 법선 방향으로 밀거나(+) 당긴다(-)
+    PressPull { body: usize, face: usize, distance: f64 },
+    /// 단순 구멍: origin 에서 -normal 방향으로 원통을 잘라낸다
+    Hole {
+        #[serde(default)]
+        body: Option<usize>,
+        origin: V3,
+        normal: V3,
+        diameter: f64,
+        #[serde(default)]
+        depth: f64,
+        #[serde(default)]
+        through: bool,
+    },
+    /// 쉘: 선택한 면을 열고 두께만큼 속을 비운다
+    Shell { body: usize, #[serde(default)] faces: Vec<usize>, thickness: f64 },
+    /// 이동/복사: pivot 기준 회전 후 이동
+    Move {
+        body: usize,
+        #[serde(default)]
+        translate: V3,
+        #[serde(default = "z_up")]
+        axis: V3,
+        #[serde(default)]
+        angle: f64,
+        #[serde(default)]
+        pivot: V3,
+        #[serde(default)]
+        copy: bool,
+    },
+    /// 바디 제거 (삭제)
+    Remove { body: usize },
     /// STEP/IGES/BREP 파일 삽입
     Import {
         path: String,
