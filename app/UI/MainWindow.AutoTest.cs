@@ -81,7 +81,7 @@ public partial class MainWindow
             Check(_mode == Mode.Sketch && ActiveSketch != null, "XY 평면 클릭으로 스케치 모드 진입");
             Check(ActiveSketch != null && new Frame(ActiveSketch.Plane).N.Z > 0.99f, "스케치 평면 법선 = +Z");
             Cam.Home(new Vector3(-10), new Vector3(60, 40, 30));
-            SnapGrid.IsChecked = false;
+            SnapGrid.IsChecked = true; // 기본값: 그리드 스냅으로 정확한 치수
             await Settle(500);
             SetSketchTool(SketchTool.Rect);
             await ClickWorld(new Vector3(0, 0, 0));
@@ -115,7 +115,7 @@ public partial class MainWindow
             await Settle();
             Check(Scene.Bodies.Count == 1, "돌출 후 바디 1개");
             var b0 = Scene.Bodies.FirstOrDefault();
-            Check(b0 != null && Math.Abs(b0.BBox[5] - 15) < 1e-3 && Math.Abs(b0.BBox[3] - 40) < 1e-3, $"바디 크기 40×30×15 (bbox {string.Join(",", b0?.BBox.Select(x => x.ToString("0.##")) ?? [])})");
+            Check(b0 != null && Math.Abs(b0.BBox[5] - 15) < 1e-6 && Math.Abs(b0.BBox[3] - 40) < 1e-6 && Math.Abs(b0.BBox[4] - 30) < 1e-6, $"바디 크기 40×30×15 (bbox {string.Join(",", b0?.BBox.Select(x => x.ToString("0.##")) ?? [])})");
             Check(b0 != null && b0.FaceCount == 7, $"면 7개 = 상자 6 + 구멍 1 (실제 {b0?.FaceCount})");
 
             // 3) 모깎기: 앞쪽 위 모서리 클릭
