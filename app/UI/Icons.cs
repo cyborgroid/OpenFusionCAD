@@ -62,12 +62,59 @@ public static class Icons
         ["last"] = [("M18,5 L18,19 M6,5 L15,12 L6,19 Z", Dark, Dark)],
         ["cloud"] = [("M7,18 L18,18 A4,4 0 0 0 17,10 A6,6 0 0 0 6,11 A3.5,3.5 0 0 0 7,18 Z", LightBlue, Blue)],
         ["error"] = [("M12,3 L22,20 L2,20 Z", "#FDE2E2", Red), ("M12,9 L12,14 M12,16.5 L12,17.5", null, Red)],
+        ["component"] = [("M4,8 L12,4 L20,8 L20,17 L12,21 L4,17 Z", "#FFFFFF", Gray), ("M15,15 h6 M18,12 v6", null, Green)],
+        ["form"] = [("M4,14 Q4,5 12,5 Q20,5 20,14 Q20,20 12,20 Q4,20 4,14 Z", "#E3D2F5", "#7B4BC4"), ("M8,11 L16,11 M8,15 L16,15", null, "#7B4BC4")],
+        ["presspull"] = [("M4,12 L12,16 L20,12 L12,8 Z", LightOrange, Orange), ("M12,7 L12,1 M9,4 L12,1 L15,4 M12,17 L12,23 M9,20 L12,23 L15,20", null, Blue)],
+        ["hole"] = [("M3,9 L12,5 L21,9 L12,13 Z", LightOrange, Orange), ("M3,9 L3,15 L12,19 L21,15 L21,9", "#E8B66E", Orange), ("M9,9 A3,1.5 0 1 0 15,9 A3,1.5 0 1 0 9,9 Z", Dark, Dark)],
+        ["shell"] = [("M4,8 L12,4 L20,8 L20,17 L12,21 L4,17 Z", LightOrange, Orange), ("M7,9 L12,6.5 L17,9 L17,15 L12,18 L7,15 Z", "#FFFFFF", Orange)],
+        ["move"] = [("M12,2 L12,22 M2,12 L22,12 M9,5 L12,2 L15,5 M9,19 L12,22 L15,19 M5,9 L2,12 L5,15 M19,9 L22,12 L19,15", null, Blue), ("M9,9 h6 v6 h-6 Z", LightOrange, Orange)],
+        ["appearance"] = [("M4,20 Q2,12 8,6 Q14,1 19,5 Q22,8 18,11 Q15,13 18,16 Q20,20 14,21 Q8,22 4,20 Z", "#F5E6C8", Dark), ("M8,9 h2 v2 h-2 Z", Red, Red), ("M12,7 h2 v2 h-2 Z", Blue, Blue), ("M8,14 h2 v2 h-2 Z", Green, Green)],
+        ["combine"] = [("M3,6 h11 v11 h-11 Z", LightOrange, Orange), ("M10,10 h11 v11 h-11 Z", "#E8B66E", Orange)],
+        ["pattern"] = [("M3,3 h6 v6 h-6 Z M15,3 h6 v6 h-6 Z M3,15 h6 v6 h-6 Z M15,15 h6 v6 h-6 Z", LightOrange, Orange)],
+        ["joint"] = [("M5,12 A4,4 0 1 0 13,12 A4,4 0 1 0 5,12 Z", LightGray, Dark), ("M11,12 A4,4 0 1 0 19,12 A4,4 0 1 0 11,12 Z", "#FFFFFF", Dark)],
+        ["offsetplane"] = [("M3,15 L13,10 L21,15 L11,20 Z", LightOrange, Orange), ("M3,9 L13,4 L21,9 L11,14 Z", "#FFFFFF", Orange)],
+        ["axis"] = [("M3,21 L21,3", null, Orange), ("M8,12 A6,3 0 1 0 16,12", null, Gray)],
+        ["interference"] = [("M3,6 h11 v11 h-11 Z", LightBlue, Blue), ("M10,10 h11 v11 h-11 Z", LightOrange, Orange), ("M10,10 h4 v7 h-4 Z", Red, Red)],
+        ["section"] = [("M4,8 L12,4 L20,8 L20,17 L12,21 L4,17 Z", LightOrange, Orange), ("M2,13 L22,13", null, Red)],
+        ["canvas"] = [("M3,5 h18 v14 h-18 Z", "#FFFFFF", Dark), ("M5,16 L10,10 L14,14 L17,11 L20,16 Z", LightBlue, Blue)],
+        ["decal"] = [("M5,4 h14 v16 h-14 Z", "#FFFFFF", Dark), ("M8,8 h8 v6 h-8 Z", Yellow, Orange)],
+        ["window"] = [("M3,5 h18 v14 h-18 Z", null, Blue), ("M7,9 h6 v6 h-6 Z", LightBlue, Blue)],
+        ["polygon"] = [("M12,3 L20,8 L20,16 L12,21 L4,16 L4,8 Z", LightBlue, Blue)],
+        ["rectcenter"] = [("M4,6 L20,6 L20,18 L4,18 Z", LightBlue, Blue), ("M11,11 h2 v2 h-2 Z", Dark, Dark)],
+        ["point"] = [("M9,12 A3,3 0 1 0 15,12 A3,3 0 1 0 9,12 Z", Blue, Blue)],
+        ["dimension"] = [("M4,6 L4,18 M20,6 L20,18 M4,12 L20,12 M7,9 L4,12 L7,15 M17,9 L20,12 L17,15", null, Dark)],
+        ["sketchfillet"] = [("M4,20 L4,10 Q4,4 10,4 L20,4", null, Blue)],
+        ["offset"] = [("M4,18 L4,8 L16,8", null, Blue), ("M8,20 L8,12 L20,12", null, Orange)],
+        ["mirror"] = [("M12,2 L12,22", null, Gray), ("M10,6 L3,12 L10,18 Z", LightBlue, Blue), ("M14,6 L21,12 L14,18 Z", "#FFFFFF", Blue)],
+        ["circpattern"] = [("M10,3 h4 v4 h-4 Z M17,10 h4 v4 h-4 Z M10,17 h4 v4 h-4 Z M3,10 h4 v4 h-4 Z", LightBlue, Blue)],
+        ["project"] = [("M4,16 L12,20 L20,16 L12,12 Z", LightOrange, Orange), ("M12,3 L12,11 M9,8 L12,11 L15,8", null, Blue)],
+        ["c-horizontal"] = [("M3,12 L21,12", null, Dark)],
+        ["c-coincident"] = [("M5,19 L19,5", null, Dark), ("M9,12 A3,3 0 1 0 15,12 A3,3 0 1 0 9,12 Z", "#FFFFFF", Dark)],
+        ["c-tangent"] = [("M4,16 A8,8 0 0 1 20,16", null, Dark), ("M2,8 L22,8", null, Dark)],
+        ["c-equal"] = [("M5,9 L19,9 M5,15 L19,15", null, Dark)],
+        ["c-parallel"] = [("M8,3 L4,21 M20,3 L16,21", null, Dark)],
+        ["c-perpendicular"] = [("M4,20 L20,20 M8,20 L8,4", null, Dark)],
+        ["c-fix"] = [("M8,10 L16,10 L16,20 L8,20 Z", Yellow, Dark), ("M9,10 L9,7 A3,3 0 0 1 15,7 L15,10", null, Dark)],
+        ["c-midpoint"] = [("M3,18 L21,6", null, Dark), ("M10,10 L14,10 L12,14 Z", Dark, Dark)],
+        ["c-concentric"] = [("M3,12 A9,9 0 1 0 21,12 A9,9 0 1 0 3,12 Z M8,12 A4,4 0 1 0 16,12 A4,4 0 1 0 8,12 Z", null, Dark)],
+        ["c-collinear"] = [("M2,12 L9,12 M15,12 L22,12", null, Dark)],
+        ["bulb"] = [("M8,13 A5,5 0 1 1 16,13 L15,16 L9,16 Z", Yellow, "#8A6A00"), ("M9,18 L15,18 M10,20 L14,20", null, "#8A6A00")],
+        ["bulboff"] = [("M8,13 A5,5 0 1 1 16,13 L15,16 L9,16 Z", "#FFFFFF", Gray), ("M9,18 L15,18 M10,20 L14,20", null, Gray)],
+        ["extensions"] = [("M5,9 h4 a2,2 0 1 1 4,0 h4 v4 a2,2 0 1 1 0,4 v4 h-12 Z", LightGray, Dark)],
+        ["jobstatus"] = [("M3,12 A9,9 0 1 0 21,12 A9,9 0 1 0 3,12 Z", null, Dark), ("M12,6 L12,12 L16,14", null, Dark)],
+        ["bell"] = [("M6,17 L6,11 A6,6 0 0 1 18,11 L18,17 L20,19 L4,19 Z", LightGray, Dark), ("M10,21 h4", null, Dark)],
+        ["lookat"] = [("M3,5 h14 v10 h-14 Z", LightGray, Dark), ("M20,10 L20,20 L10,20", null, Blue)],
+        ["gridsnap"] = [("M3,3 h18 v18 h-18 Z M9,3 v18 M15,3 v18 M3,9 h18 M3,15 h18", null, Dark)],
+        ["viewports"] = [("M3,4 h18 v16 h-18 Z M12,4 v16 M3,12 h18", null, Dark)],
+        ["info"] = [("M3,12 A9,9 0 1 0 21,12 A9,9 0 1 0 3,12 Z", "#FFFFFF", Gray), ("M12,10 L12,17 M12,6.5 L12,7.5", null, Gray)],
+        ["comment"] = [("M4,5 h16 v10 h-9 l-4,4 v-4 h-3 Z", "#FFFFFF", Dark)],
+        ["generic"] = [("M5,5 h14 v14 h-14 Z", "#F1F3F5", "#9AA0A8"), ("M9,12 h6", null, "#9AA0A8")],
     };
 
     public static Control Make(string name, double size = 24)
     {
         var canvas = new Canvas { Width = 24, Height = 24 };
-        if (Defs.TryGetValue(name, out var layers))
+        if (Defs.TryGetValue(name, out var layers) || Defs.TryGetValue("generic", out layers))
             foreach (var (path, fill, stroke) in layers)
                 canvas.Children.Add(new Path
                 {
@@ -92,6 +139,11 @@ public static class Icons
         "Cylinder" => "cylinder",
         "Sphere" => "sphere",
         "Import" => "insert",
+        "PressPull" => "presspull",
+        "Hole" => "hole",
+        "Shell" => "shell",
+        "Move" => "move",
+        "Remove" => "trim",
         _ => "body",
     };
 }
